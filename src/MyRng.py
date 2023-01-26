@@ -1,13 +1,13 @@
 import numpy as np
 
-# Use the first prime number >10,000,000 = 10,000,019
+# Use the first prime number >1,000,000 = 1,000,003
 
 class MyRng():
     nglobal=0
-    nlist = np.zeros(10000019)
+    nlist = np.zeros(1000003)
     def __init__(self,seed=0):
-        fin = open('rng10M.dat','r')
-        for i in range(0,10000019): self.nlist[i] = float(fin.readline())
+        fin = open('rng1M.dat','r')
+        for i in range(0,1000003): self.nlist[i] = float(fin.readline())
         self.nglobal = seed
         
     def random(self,n=1):
