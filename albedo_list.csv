@@ -1,0 +1,16 @@
+Files,rmin,rmax,amin,amax,prob,EEC
+Archean_Earth,			0.8,	1.4,	0.95,	1.67,	0.39,True
+Earth,				0.8,	1.4,	0.95,	1.67,	0.24,True
+Hazy_Archean_Earth,		0.8,	1.4,	0.95,	1.67,	0.05,True
+Proterozoic_Earth-hi_o2,	0.8,	1.4,	0.95,	1.67,	0.16,True
+Proterozoic_Earth-lo_o2,	0.8,	1.4,	0.95,	1.67,	0.16,True
+Venus,				0.7,	1.5,	0.0,	1.0,	1.0,False
+Mars,				0.0,	2.0,	0.0,	1.e20,	1.0,False
+Early_Mars,			0.3,	2.0,	0.85,	2.0,	1.0,False
+Jupiter,			6.0,	1.e20,	0.0,	1.e20,	1.0,False
+Saturn,				6.0,	10.0,	0.0,	1.e20,	1.0,False
+Uranus,				1.5,	8.0,	3.0,	1.e20,	1.0,False
+Neptune,			1.5,	8.0,	3.0,	1.e20,	1.0,False
+Warm_Neptune_1AU_Clouds,	1.5,	8.0,	0.0,	2.0,	1.0,False
+Warm_Neptune_1AU_NoClouds,	1.5,	8.0,	0.0,	2.0,	1.0,False
+Warm_Neptune_2AU,		1.5,	8.0,	1.0,	4.0,	1.0,False
