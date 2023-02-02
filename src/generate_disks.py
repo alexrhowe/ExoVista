@@ -4,23 +4,26 @@ import os
 from astropy.io import fits
 from datetime import datetime
 import matplotlib.pyplot as plt
-from src import MyRng
-from src.defaults import dlabel,mincomponents,maxcomponents,pllabel,grav_const,c
+from src.constants import *
+from src import Settings
 
-rng = MyRng.MyRng()
-#rng = np.random.default_rng()
+settings = Settings.Settings()
+rng = np.random.default_rng()
 
-def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_components=False):
+def generate_disks(stars, planets, settings, nexozodis=None, rand_components=False):
+
+    settings = settings
+    rng = np.random.default_rng(settings.seed)
     
     nstars = len(stars)
-    if ncomponents < mincomponents or ncomponents > maxcomponents:
+    if settings.ncomponents < mincomponents or settings.ncomponents > maxcomponents:
         print('ERROR: Maximum number of disk components is set to {0:d}-{1:d}'.format(mincomponents,maxcomponents))
         return
 
     if rand_components:
         ndisks = rng.integers(mincomponents,maxcomponents,nstars)
     else:
-        ndisks = np.full(nstars,ncomponents)
+        ndisks = np.full(nstars,settings.ncomponents)
     disks = np.zeros((nstars,maxcomponents,len(dlabel)))
     disks[:,:,dlabel.index('n')] = -1
     compositions = np.full(nstars,'')
@@ -40,25 +43,13 @@ def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_component
     w: HG weighting factors for each function and component
     '''
   
-    # Define some variables
-    density_ratio = 5.      # all components have the same density w/in this factor
-    stability_factor = 3.
-    rinner_mass_threshold = 100.
-    dror_min = 0.05         # dust belts must be at least this wide
-    dror_max = 0.3
-    hor_min = 0.03
-    hor_max = 0.2
-    r_min = [0.5,5.,50.]    # min circumstellar distance of each disk component
-    r_max = [5.0,50.,500.]  # max circumstellar distance of each disk component
-  
     # Distribute exozodi levels
     if nexozodis is not None:
         nzl = nexozodis
     else:
         with fits.open('nominal_maxL_distribution-Dec2019.fits') as data: nexozodi_levels = pd.DataFrame(data[0].data)
         nzl = np.array(nexozodi_levels[nexozodi_levels.columns[0]].values)
-        #np.random.shuffle(nzl) # Built-in pseudorandom function
-        nzl = rng.shuffle(nzl)  # Deterministic version for testing
+        rng.shuffle(nzl,axis=0)  # Deterministic version for testing
     
     # all disks assigned the same orientation as system midplane
     disks[:,:,dlabel.index('longnode')] = 0.
@@ -70,8 +61,8 @@ def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_component
     disks[:,0,dlabel.index('nzodis')] = nzl[0:nstars] * 0.642
     # factor of 0.642 accounts for the fact that cold components will also contribute dust to reproduce the LBTI distribution
     
-    maxfac = np.log10(density_ratio)    # outer disks must be within some density factor of inner disk
-    minfac = np.log10(1./density_ratio)
+    maxfac = np.log10(settings.density_ratio)    # outer disks must be within some density factor of inner disk
+    minfac = np.log10(1./settings.density_ratio)
     for i in range(0,nstars):
         if ndisks[i] > 1:
             for icomp in range(1,ndisks[i]):
@@ -108,15 +99,15 @@ def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_component
         # Calculate Hill radii of all planets
         # Note that all missing planets will have a Hill radius = 0
         hill_radius = p[:,pllabel.index('a')] * (1.-p[:,pllabel.index('e')]) * (p[:,pllabel.index('M')] / (3 * s['mass'] * 333000.))**(1./3.) # AU
-        hinner = p[:,pllabel.index('a')] - hill_radius * stability_factor
-        houter = p[:,pllabel.index('a')] + hill_radius * stability_factor
+        hinner = p[:,pllabel.index('a')] - hill_radius * settings.stability_factor
+        houter = p[:,pllabel.index('a')] + hill_radius * settings.stability_factor
         j = [j for j in range(0,len(p)) if hinner[j]>0 and p[j,pllabel.index('M')]>1.e-3]
         hinner = hinner[j]
         houter = houter[j]
         
         # Convert from Hill spheres to gaps between planets, including inside and outside the planets
-        minr = min(r_min)
-        maxr = max(r_max)
+        minr = min(settings.r_min)
+        maxr = max(settings.r_max)
         ginner = np.append(0,houter)
         gouter = np.append(hinner,1.e20)
         
@@ -147,7 +138,7 @@ def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_component
         # First, the easy stuff that doesn't depend on the system architecture...
         for j in range(0,ndisks[i]):
             disks[i,j,dlabel.index('n')] = j
-            disks[i,j,dlabel.index('hor')] = rng.random() * (hor_max - hor_min) + hor_min
+            disks[i,j,dlabel.index('hor')] = rng.random() * (settings.hor_max - settings.hor_min) + settings.hor_min
             disks[i,j,dlabel.index('g0')] = rng.random() * (0.995-0.8) + 0.8  # most forward scatt term
             disks[i,j,dlabel.index('g1')] = rng.random() * (0.8-0.35) + 0.35  # medium forward scatt term
             disks[i,j,dlabel.index('g2')] = rng.random() * (0.35+0.3) - 0.3   # least forward scatt term
@@ -169,7 +160,7 @@ def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_component
             measure = np.sum(lbouter-lbinner)
             n = 0
             
-            while (dror < dror_min) or (r0 < r_min[j] or r_max[j] < r0) and n<50:
+            while (dror < settings.dror_min) or (r0 < settings.r_min[j] or settings.r_max[j] < r0) and n<50:
                 rand = rng.random()*measure
                 ip = 0
                 while ip < len(binner):
@@ -184,7 +175,7 @@ def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_component
                 dror = max(r0-binner[ip], bouter[ip]-r0)/r0
                 n += 1
 
-            dror = min(dror,dror_max)
+            dror = min(dror,settings.dror_max)
 
             # Note: these do not determine the edges of the disk, but breaking points in the geometry.
             disks[i,j,dlabel.index('r')] = r0
@@ -192,11 +183,11 @@ def generate_disks(stars, planets, nexozodis=None, ncomponents=2, rand_component
             disks[i,j,dlabel.index('rinner')] = 0.0
                 
             # Determine if a massive planet could truncate the inward migrating component
-            k = np.array( [ jj for jj in range(0,len(p)) if p[jj,pllabel.index('a')] < disks[i,j,dlabel.index('r')] and p[jj,pllabel.index('M')] > rinner_mass_threshold ] )
+            k = np.array( [ jj for jj in range(0,len(p)) if p[jj,pllabel.index('a')] < disks[i,j,dlabel.index('r')] and p[jj,pllabel.index('M')] > settings.rinner_mass_threshold ] )
             if len(k)>0: disks[i,j,dlabel.index('rinner')] = min( (1.1 * np.max( p[k,pllabel.index('a')] * (1+p[k,pllabel.index('e')]) )), disks[i,j,dlabel.index('r')] )
             
             # If the while loop failed to find a valid r, set density to zero
-            if dror < dror_min: disks[i,j,dlabel.index('nzodis')] = 0.
+            if dror < settings.dror_min: disks[i,j,dlabel.index('nzodis')] = 0.
             
             # Now that we have the locations we can determine collision rates...
             beta = 0.5

@@ -2,9 +2,12 @@ import numpy as np
 import pandas as pd
 from src import read_solarsystem
 from src import generate_scene
+from src import Settings
+
+# ExoVista v2.1
 
 # Generates a single, user-defined planetary system.
 
-kwargs = {'timemax':1.0e-10,'output_dir':'output2','diskoff':False,'specres':300.,'configtest':3}
-s,p,a,d,c = read_solarsystem.read_solarsystem('solar_system.dat')
-generate_scene.generate_scene(s,p,d,a,c,**kwargs)
+settings = Settings.Settings(output_dir='output', ncomponents=3, timemax=10.0) # "standard" configuration
+s,p,a,d,c = read_solarsystem.read_solarsystem(settings,system_file='solar_system.dat')
+generate_scene.generate_scene(s,p,d,a,c,settings)

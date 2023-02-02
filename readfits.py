@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from astropy.visualization import astropy_mpl_style
 from astropy.utils.data import get_pkg_data_filename
 import os
+import sys
+import time
 
 filename = 'output/-1-HIP_-TYC_SUN-mv_4.83-L_1.00-d_10.00-Teff_5778.00.fits'
 
@@ -15,27 +17,49 @@ planetcolors = {'Archean_Earth':(0.0,1.0,0.0),'Earth':(0.0,1.0,0.0),'Hazy_Archea
 plt.style.use('dark_background')
 plt.rcParams['animation.embed_limit'] = 2**128
 
-lambda_ref = 0.50 # reference wavelength in microns
+lambda_ref    = 0.50  # reference wavelength in microns
+mirror_size   = 6.7   # mirror diameter in meters
+disk_gain     = 1.0   # multiplies the brightness of the disk image
+log_disk      = False # color the disk brightness on a logarithmic scale
+planet_bright = False # scale planet brightnesses based on their positions on their phase curves
+color_code    = False # color-code the planets based on type
+fitsdir = './output'  # directory of FITS files
 
-'''
-# Find available stars to plot
-fitsdir = './output'
-fitslist = []
-for root, dirs, files in os.walk(fitsdir):
-    for file0 in files:
-        if file0[-5:] == '.fits': fitslist.append(fitsdir + '/' + file0)
-fitslist = sorted(fitslist)
+filename = ''
 
-for i in range(0,len(fitslist)): print(i, fitslist[i]) # print the list with indices if you need it
-hdul = fits.open(fitslist[0])
-'''
+if len(sys.argv)>1:
+    filename = sys.argv[1]
+else:
+    print('Listing available files in FITS file directory...')
+    time.sleep(2)
+    fitslist = []
+    for root, dirs, files in os.walk(fitsdir):
+        for file0 in files:
+            if file0[-5:] == '.fits': fitslist.append(fitsdir + '/' + file0)
+    fitslist = sorted(fitslist)
+    
+    for i in range(0,len(fitslist)): print(i, fitslist[i]) # print the list with indices if you need it
+    print('Enter file number or other file name.')
+    filenum = input()
 
-hdul = fits.open(filename)
+    try:
+        filenum = int(filenum)
+        filename = fitslist[filenum]
+    except:
+        filename = filenum
+
+try: hdul = fits.open(filename)
+except:
+    print('Error: file not found.')
+    exit()
 hdul.info()
 
+# Check whether FITS file is complete.
 if len(hdul) < 4:
-    print('Error missing extensions in FITS file.')
+    print('Error: missing extensions in FITS file.')
     exit()
+
+# Check whether multiple timesteps exist.
 notime = False
 if hdul[3].data.ndim > 1:
     ntimes = len(hdul[3].data)
@@ -44,6 +68,7 @@ else:
     notime = True
     ntimes = 1
     npoints = len(hdul[3].data)
+    
 nplanets = len(hdul)-4
 if(abs(hdul[-1].header['A']-1)<1.e-5): nplanets -= 1 # remove the extra Earth twin if it is present
 
@@ -64,20 +89,19 @@ print('Disk brightness plotted at {0:5.1f} nm'.format(hdul[1].data[ild]*1000))
 disk = hdul[2].data[ild,:,:]
 mindisk = np.log10(np.min(disk))
 maxdisk = np.log10(np.max(disk))
-#disk = (np.log10(disk)-mindisk)/(maxdisk-mindisk) # logarithmic disk brightness for testing
+if log_disk: disk = (np.log10(disk)-mindisk)/(maxdisk-mindisk) # logarithmic disk brightness for testing
 
 # Compute lambda/D
 pixscale = hdul[2].header['PXSCLMAS'] # pixel size in mas
-D = 6.7 # mirror diameter in meteres
-loD = (lambda_ref / (D*1.e6) * 180./np.pi * 3.6e6) / pixscale
+loD = (lambda_ref / (mirror_size*1.e6) * 180./np.pi * 3.6e6) / pixscale
 
 # Black out the central region within 1.5*lambda/D of the star
 for i in range(0,250):
     for j in range(0,250):
         if (i-125)**2 + (j-125)**2 <= (loD*1.5)**2: disk[i,j] = np.min(disk)
 
-gain = 1.0 # amplify the disk at the cost of saturating the center
-disk = np.minimum(disk*gain,np.max(disk))
+# Apply gain
+disk = np.minimum(disk*disk_gain,np.max(disk))
 
 fig = plt.figure(figsize=(10.8,10.8))
 ax = fig.add_subplot(111)
@@ -112,8 +136,7 @@ plbright = np.zeros((nplanets,ntimes))
 for i in range(0,nplanets):
     plbright[i] = planetdata[i,:,ilam]
     plbright[i] /= np.max(plbright[i])  # normalize each planet's brightness to the maximum over its orbit
-    if i>0: albedos.append(hdul[i+4].header['ALBEDO_F'])
-plbright /= np.max(plbright[1:,0])
+    albedos.append(hdul[i+4].header['ALBEDO_F'])
 
 for i in range(0,nplanets):
     x = planetdata[i,0,1]
@@ -121,17 +144,15 @@ for i in range(0,nplanets):
     if (x-125)**2 + (y-125)**2 <= (loD*1.5)**2: continue
     bright = plbright[i,0]
     dots[i].set_data([x],[y])
-
+    
     # Set planet colors
+    if not planet_bright: bright = 1.0 # Sets all planets to maximum brightness
     newcolor = (bright,bright,bright) # Sets all planets to greyscale based on their brightness
-    #if ntimes > 1: newcolor=(1.0,1.0,1.0) # Sets all planets to white.
+    
     # Color-codes planets based on type.
-    '''
-    if i>0:
-        newcolor = tuple([bright*x for x in planetcolors[albedos[i-1]]])
-        print(i,albedos[i-1])
-    newcolor = tuple([bright*x for x in newcolor])
-    '''
+    if color_code and albedos[i] in planetcolors:
+        newcolor = tuple([bright*x for x in planetcolors[albedos[i]]])
+    
     dots[i].set_color(newcolor)
 
 plt.style.use('default')
@@ -161,18 +182,19 @@ plt.legend()
 # Plot 4: Contrast phase curves of the planets at the reference wavelength
 # Will be blank if there is only one timestep.
 
-ptime = stardata[:,ilam+15]
-time = np.arange(len(ptime))*10
-
-fig4 = plt.figure()
-ax4 = fig4.add_subplot(111)
-for i in range(0,nplanets):
-    ptime = planetdata[i,:,ilam+15]
-    ax4.plot(time,ptime,label='Planet {0:d}'.format(i))
-plt.legend()
+if not notime:
+    ptime = stardata[:,ilam+15]
+    time = np.arange(len(ptime))*10
+    
+    fig4 = plt.figure()
+    ax4 = fig4.add_subplot(111)
+    for i in range(0,nplanets):
+        ptime = planetdata[i,:,ilam+15]
+        ax4.plot(time,ptime,label='Planet {0:d}'.format(i))
+    plt.legend()
+    #fig4.savefig('phase_curves.png')
 
 #fig.savefig('disk_image.png')
 #fig2.savefig('disk_profile.png')
 #fig3.savefig('planet_spectra.png')
-#fig4.savefig('phase_curves.png')
 plt.show()

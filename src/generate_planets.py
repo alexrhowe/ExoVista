@@ -1,14 +1,12 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp2d
-from src import MyRng
-from src.defaults import pllabel
+from src.constants import pllabel, maxnplanets
+from src import Settings
 
-maxnplanets = 30
+settings = Settings.Settings()
 
-rng = MyRng.MyRng(seed=0)
-#rng = np.random.default_rng()
-
+rng = np.random.default_rng()
 
 # Read in bins for planet types.
 fbound = open('planetbins.dat','r')
@@ -57,20 +55,23 @@ def radius_to_mass(R):
     return M
     
 
-def generate_planets(stars, bound='', nomcdraw=False, addearth=False, usebins=False, subdivide=1, emin=0., emax=0., imin=0., imax=5., sysimin=0., sysimax=180., sysPAmin=0., sysPAmax=360.):
-        
+def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, usebins=False, subdivide=1):
+    
+    settings = settings
+    rng = np.random.default_rng(seed=settings.seed)
+    
     subdivide = max(1,min(subdivide,10))
     
-    if emax < emin:
+    if settings.emax < settings.emin:
         print('Error: emax must be greater than emin.')
         return
     
-    if imax < imin:
+    if settings.imax < settings.imin:
         print('Error: imax must be greater than imin.')
         return
 
-    cossysimin = np.cos(sysimin * np.pi/180.)
-    cossysimax = np.cos(sysimax * np.pi/180.)
+    cossysimin = np.cos(settings.sysimin * np.pi/180.)
+    cossysimax = np.cos(settings.sysimax * np.pi/180.)
     
     nstars = len(stars)
     
@@ -106,7 +107,7 @@ def generate_planets(stars, bound='', nomcdraw=False, addearth=False, usebins=Fa
         stars['I'] = temp
   
     # Randomly assign system midplane orientation
-    stars['PA'] = rng.random(nstars) * (sysPAmax-sysPAmin) + sysPAmin
+    stars['PA'] = rng.random(nstars) * (settings.sysPAmax-settings.sysPAmin) + settings.sysPAmin
 
     stars['I'] = np.arccos((rng.random(nstars) * (cossysimin-cossysimax) + cossysimax)) * 180./np.pi
     temprand = rng.random(nstars)
@@ -182,13 +183,13 @@ def generate_planets(stars, bound='', nomcdraw=False, addearth=False, usebins=Fa
     n_nochange = 0
     jj = 0
     
-    while nplanets < nexpected and n_nochange < 50:
+    while nplanets < nexpected and n_nochange < 50 and jj < 200:
         print('Iteration number: ',jj)
         print('{0:d} planets expected.'.format(nexpected))
         prev_nplanets = nplanets
      
         # First, add some random planets based on occurrence rates
-        plorb, hillsphere_flag = add_planets(stars, plorb, expected, medge, aedge, hillsphere_flag, emin, emax, imin, imax)
+        plorb, hillsphere_flag = add_planets(stars, plorb, expected, medge, aedge, hillsphere_flag)
 
         # Number of stars with new planets
         nnew = len(np.where(hillsphere_flag)[0])
@@ -207,7 +208,7 @@ def generate_planets(stars, bound='', nomcdraw=False, addearth=False, usebins=Fa
         if dnp<=0: n_nochange += 1   # Ends loop if no increase for 50 iterations.
         else: n_nochange = 0         # (No change gets stuck for small target lists.)
         jj += 1
-        print('Unchanged for {0:d} iterations.\n'.format(n_nochange))
+        print('No increase for {0:d} iterations.\n'.format(n_nochange))
         
     # Erase semi-major axis of non-existant planets
     for i in range(0,nstars):
@@ -240,7 +241,7 @@ def generate_planets(stars, bound='', nomcdraw=False, addearth=False, usebins=Fa
     return plorb, albedos
     
 
-def load_occurrence_rates(subdivide=1, bound='', mass=True, usebins=False, sag13=False):
+def load_occurrence_rates(subdivide=1, bound='', mass=True, usebins=False):
 
     # Note: I turned this into a wrapper for separate read-in functions because
     # I could not follow the "use r and p as variables no matter what quantities we're working with" notation.
@@ -253,11 +254,7 @@ def load_occurrence_rates(subdivide=1, bound='', mass=True, usebins=False, sag13
     returned are integrated over the bin.
     
     By default, the nominal occurrence rates of Dulz & Plavchan
-    are returned.  Users can set the ll or ul keywords to return
-    the "1-sigma" lower and upper limits, respectively.
-    Users can also set the sag13 keyword to return the pure SAG13
-    analytically-calculated occurrence rates.
-
+    are returned.
     Two tables are provided.
     The 'Mass' table is in M-a space.
     The 'Radius' table is in R-P space.
@@ -265,28 +262,19 @@ def load_occurrence_rates(subdivide=1, bound='', mass=True, usebins=False, sag13
     
     Notes:
     - the Dulz & Plavchan occurrence rate files are used to set the grid
-    spacing, even if SAG13 are requested.
+    spacing.
     - Dulz & Plavchan occ rates are not analytic, so we must interpolate
     their results to the desired resolution
     '''
 
-    tag = mass
+    tag = ''
+    if mass: tag = 'Mass'
     subdivide = min(max(1,subdivide),10) # Keep the occurrence rate grid a reasonable size.
     
     filename = 'occurrence_rates/NominalOcc_' + tag + '.csv'
     if bound=='lower': filename = 'occurrence_rates/PessimisticOcc_' + tag + '.csv'
     if bound=='upper':  filename = 'occurrence_rates/OptimisticOcc_' + tag + '.csv'
-    '''
-    if mass and sag13:
-        print('Cannot request SAG13 occurrence rates in (mass, semi-major axis) space.')
-        return
     
-    elif mass:
-        return load_occurrence_ratesMA(filename, subdivide=subdivide, usebins=usebins)
-    
-    else:
-        return load_occurrence_ratesRP(filename, subdivide=subdivide, usebins=usebins, sag13=sag13)
-    '''
     return load_occurrence_ratesMA(filename, subdivide=subdivide, usebins=usebins)
 
 
@@ -392,72 +380,7 @@ def load_occurrence_ratesMA(filename, subdivide=1, usebins=False):
     return newoccrate, medge, aedge, mmid, amid
 
 
-def sag13_eta_grid(rmin=0.5, rmax=11.6, amin=1./np.sqrt(185.), amax=1./np.sqrt(0.0055), nbins=1000):
-    
-    # creates a grid of eta values
-    # planet radius is along y axis
-    # planet semi-major axis is along x axis
-    
-    #if nbins<1000: print('Warning: nbins<1000 may result in too coarse a grid.')
-    
-    # For mean SAG13 results:
-    gamma_i = [0.38,0.73]
-    alpha_i = [-0.19,-1.18]
-    beta_i = [0.26,0.59]
-    r_crit = 3.4
-    
-    # For "1-sigma" lower limit:
-    llgamma_i = [0.138,0.72]
-    llalpha_i = [0.277,-1.58]
-    llbeta_i = [0.204,0.51]
-    llr_crit = 3.4
-    
-    # For "1-sigma" upper limit:
-    ulgamma_i = [1.06,0.78]
-    ulalpha_i = [-0.68,-0.82]
-    ulbeta_i = [0.32,0.67]
-    ulr_crit = 3.4
-    
-    r_vec = np.linspace(np.log(rmin),np.log(rmax),nbins)
-    lnr_vec = np.log(r_vec)
-    dlnr_vec = lnr_vec[1:len(lnr_vec)] - lnr_vec[0:len(lnr_vec)-1]
-    midlnr_vec = (lnr_vec[1:len(lnr_vec)] + lnr_vec[0:len(lnr_vec)-1]) / 2.
-    midr_vec = np.exp(midlnr_vec)
-    
-    pmin = amin**1.5
-    pmax = amax**1.5
-    p_vec = np.linspace(np.log(pmin),np.log(pmax),nbins)
-    a_vec = p_vec**(2./3.)
-    lnp_vec = np.log(p_vec)
-    dlnp_vec = lnp_vec[1:len(lnp_vec)] - lnp_vec[0:len(lnp_vec)-1]
-    midlnp_vec = (lnp_vec[1:len(lnp_vec)] + lnp_vec[0:len(lnp_vec)-1]) / 2.
-    midp_vec = np.exp(midlnp_vec)
-        
-    eta_array = np.zeros((len(midr_vec),len(midp_vec),3))
-    for ir in range(0,len(midr_vec)):
-        
-        # Lower limit
-        if midr_vec[ir] <= llr_crit: tempindex = 0
-        else: tempindex = 1
-        for ip in range(0,len(midp_vec)):
-            eta_array[ip,ir,0] = llgamma_i[tempindex] * midr_vec[ir]**(llalpha_i[tempindex]) * midp_vec[ip]**(llbeta_i[tempindex]) * dlnr_vec[ir] * dlnp_vec[ip]
-            
-        # Expected value
-        if midr_vec[ir] <= r_crit: tempindex = 0
-        else: tempindex = 1
-        for ip in range(0,len(midp_vec)):
-            eta_array[ip,ir,1] = gamma_i[tempindex] * midr_vec[ir]**(alpha_i[tempindex]) * midp_vec[ip]**(beta_i[tempindex]) * dlnr_vec[ir] * dlnp_vec[ip]
-            
-        #Upper limit
-        if midr_vec[ir] <= ulr_crit: tempindex = 0
-        else: tempindex = 1
-        for ip in range(0,len(midp_vec)):
-            eta_array[ip,ir,2] = ulgamma_i[tempindex] * midr_vec[ir]**(ulalpha_i[tempindex]) * midp_vec[ip]**(ulbeta_i[tempindex]) * dlnr_vec[ir] * dlnp_vec[ip]
-            
-    return eta_array
-
-
-def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, emin, emax, imin, imax):
+def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag):
     
     plorb = plorb
     nstars = len(stars)
@@ -500,8 +423,8 @@ def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, e
     temp_planets[:,pllabel.index('longnode')] = rng.random(nplanets)*360.
     temp_planets[:,pllabel.index('argperi')] = rng.random(nplanets)*360.
     temp_planets[:,pllabel.index('meananom')] = rng.random(nplanets)*360.
-    temp_planets[:,pllabel.index('e')]= emin + rng.random(nplanets)*(emax-emin)
-    temp_planets[:,pllabel.index('i')] = imin + rng.random(nplanets)*(imax-imin)
+    temp_planets[:,pllabel.index('e')]= settings.emin + rng.random(nplanets)*(settings.emax-settings.emin)
+    temp_planets[:,pllabel.index('i')] = settings.imin + rng.random(nplanets)*(settings.imax-settings.imin)
 
     ntest = 0
 
@@ -632,7 +555,6 @@ def assign_albedo_file(stars, plorb):
         plalbedo.append([])
         nplanets = len(np.where(plorb[i,:,pllabel.index('R')]>0.)[0])
         for j in range(0,nplanets):
-            EEC = False
             a_pl = plorb[i,j,pllabel.index('a')]/np.sqrt(stars['Lstar'].loc[i])
             R_pl = plorb[i,j,pllabel.index('R')]
             ilist = []
@@ -640,20 +562,23 @@ def assign_albedo_file(stars, plorb):
                 if albedos['EEC'].loc[k]:
                     if rmin[k]/np.sqrt(a_pl) < R_pl and R_pl < rmax[k] and amin[k] < a_pl and a_pl < amax[k]:
                         ilist.append(k)
-                        EEC = True
                 else:
                     if rmin[k] < R_pl and R_pl < rmax[k] and amin[k] < a_pl and a_pl < amax[k]:
                         ilist.append(k)
                         
-            if EEC: ilist = np.where(albedos['EEC'].loc[ilist].values)[0]
+            je = np.where(albedos['EEC'].loc[ilist].values)[0]
+            jn = np.where(~albedos['EEC'].loc[ilist].values)[0]
                         
             if len(ilist)==0:
                 print('Error: No albedo file specified for R={0:f} and a={0:f}.'.format(R_pl,a_pl))
-            
+
             flist = files[ilist]
-            plist = np.array(probs[ilist])
+            if len(je)==0:
+                plist = np.array(probs[ilist])
+            else:
+                plist = np.concatenate(( np.array(probs[je])*settings.eecprob, np.array(probs[jn])*(1.-settings.eecprob) ))
             plist = plist/np.sum(plist)
-            plist = np.cumsum(plist)
+            plist = np.cumsum(plist)    
             
             choose = rng.random()
             find = np.where(plist>=choose)[0]            

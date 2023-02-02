@@ -1,10 +1,14 @@
 import numpy as np
 import pandas as pd
 from src import generate_disks
-from src.defaults import starbase,strlist,intlist,pllabel,dlabel,grav_const,c
+from src.constants import *
+from src import Settings
 
-def read_solarsystem(system_file='example_system.dat'):
+settings = Settings.Settings()
 
+def read_solarsystem(settings,system_file='example_system.dat'):
+
+    settings = settings
     fin = open(system_file,'r')
     
     # Set up the star structure with default values
@@ -61,7 +65,7 @@ def read_solarsystem(system_file='example_system.dat'):
     dlist = fin.readline().split()
     
     # Call generate_disks to get the disk structure added
-    disk,composition = generate_disks.generate_disks(s,planet,ncomponents=3)
+    disk,composition = generate_disks.generate_disks(s,planet,settings)
     # reset all disk params to zero
     disk = np.zeros(disk.shape)[0]
     

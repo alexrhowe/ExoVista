@@ -12,7 +12,10 @@ import cython
 from src import coordinates as coord
 from src import nbody
 from src import wrapImage
-from src.defaults import *
+from src.constants import *
+from src import Settings
+
+settings = Settings.Settings()
 
 def load_lqsca(lqq_dir, composition, rdust, rdust_boundaries, lam):    
     '''
@@ -68,7 +71,7 @@ def lambertian(beta):
     phi = (np.sin(beta) + (np.pi-beta) * np.cos(beta)) / np.pi
     return phi
 
-def generate_scene(stars, planets, disks, albedos, compositions, **settings):
+def generate_scene(stars, planets, disks, albedos, compositions, settings):
     '''
     Some important conventions on coordinates:
     i = +/- 90 is an edge-on orientation
@@ -76,28 +79,25 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
     +y points up (N)
     +z coordinate points toward the observer (out of page)
     '''
-    globals().update(settings)
-    print('Running')
+    settings = settings
     
-    pixscale_arcsec = pixscale
-    pixscale_mas = pixscale * 1000.
-    global output_dir
-    if output_dir == 'output': print('Default output directory: ./output/')
-    if output_dir[-1] != '/': output_dir = output_dir + '/'
-    if not path.isdir(output_dir): mkdir(output_dir)
+    pixscale_arcsec = settings.pixscale
+    if settings.output_dir == 'output': print('Default output directory: ./output/')
+    if settings.output_dir[-1] != '/': settings.output_dir = settings.output_dir + '/'
+    if not path.isdir(settings.output_dir): mkdir(settings.output_dir)
 
     print('Generating scenes. (This may take a while.)')
 
     # Define time array
     timemin = 0.
-    if timemax<=0.: timemax = 1.e-10
-    ntimes = int(np.ceil((timemax-timemin)/dt))
-    time_vector = np.linspace(timemin,timemax,ntimes)
+    if settings.timemax<=0.: settings.timemax = 1.e-10
+    ntimes = int(np.ceil((settings.timemax-timemin)/settings.dt))
+    time_vector = np.linspace(timemin,settings.timemax,ntimes)
 
     # Define master wavelength array
-    dlnlambda = 1./specres
-    lnlambdamax = np.log(lambdamax)
-    lnlambdamin = np.log(lambdamin)
+    dlnlambda = 1./settings.specres
+    lnlambdamax = np.log(settings.lambdamax)
+    lnlambdamin = np.log(settings.lambdamin)
     nlambda = int(np.ceil((lnlambdamax-lnlambdamin)/dlnlambda))
     lam = np.linspace(lnlambdamin,lnlambdamax,nlambda)
     lam = np.exp(lam)
@@ -108,15 +108,14 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
     transition_lambda = np.sqrt(transition_lambda_temp[0:len(transition_lambda_temp)-1] * transition_lambda_temp[1:])
     
     # Define disk wavelength array
-    dlnlambda = 1./specrdisk
-    lnlambdamax = np.log(lambdamax*1.01) # we want lambda_disk to be slightly wider than lam for later
-    lnlambdamin = np.log(lambdamin*0.99)
+    dlnlambda = 1./settings.specrdisk
+    lnlambdamax = np.log(settings.lambdamax*1.01) # we want lambda_disk to be slightly wider than lam for later
+    lnlambdamin = np.log(settings.lambdamin*0.99)
     nlambda_disk = int(np.ceil((lnlambdamax-lnlambdamin)/dlnlambda))
     lambda_disk = np.linspace(lnlambdamin,lnlambdamax,nlambda_disk)
     lambda_disk = np.exp(lambda_disk)
     
     # Constants
-    pixscale_mas = pixscale_arcsec * 1000.
     nstars = len(stars)
     ncomponents = len(disks[0])
     nplanets = len(planets[0])
@@ -127,7 +126,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
         # First, some parameters specific to the star/system we will use later
         s = stars.iloc[i]
         
-        pixscale_AU = pixscale_mas/1000. * s['dist']
+        pixscale_AU = settings.pixscale_mas/1000. * s['dist']
         dstarAU = s['dist'] * 206265. # distance to star in AU
         GM = grav_const * s['mass']
         cosPA = np.cos(s['PA'] * np.pi/180.)
@@ -140,8 +139,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
         
         hiptag = ''
         if s['HIP'] > 0: hiptag = s['HIP']
-        if output_dir[0] == '/': tempdir = output_dir
-        else: tempdir = './' + output_dir # if output_dir is relative or absolute
+        if settings.output_dir[0] == '/': tempdir = settings.output_dir
+        else: tempdir = './' + settings.output_dir # if output_dir is relative or absolute
         if 'TYC2' in stars.columns:
             fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-TYC_' + str(s['TYC2']) + '-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])
         else:
@@ -152,13 +151,12 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
         # ----- START OF DISK IMAGING ----
         # Now we image the disk
         print('Creating disk image...')
-        disk_contrast_image = np.zeros((npix,npix,nlambda_disk))
+        disk_contrast_image = np.zeros((settings.npix,settings.npix,nlambda_disk))
         
         # Determine range of grain sizes for this star
-        rdust_blowout = 0.5   # this could be updated for each star, but that's kinda BS anyway
-        minsize = rdust_blowout
-        maxsize = min(100*np.max(lam),np.max(master_rdust_boundaries)) # 100x wavelength if possible
-        j = np.array([jj for jj in range(0,len(master_rdust)) if minsize < master_rdust[jj] and master_rdust[jj] < maxsize])
+        settings.minsize = settings.rdust_blowout
+        settings.maxsize = min(100*np.max(lam),np.max(master_rdust_boundaries)) # 100x wavelength if possible
+        j = np.array([jj for jj in range(0,len(master_rdust)) if settings.minsize < master_rdust[jj] and master_rdust[jj] < settings.maxsize])
         if len(j)==0:
             print('ERROR: no dust grain sizes meet your criteria.')
             break
@@ -176,7 +174,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
         # Qsca is now nsizes x nlambda_disk array
         
         # Now distribute a grid of points and calculate disk flux at all points
-        if not diskoff: disk_contrast_image = distribute_diskpoints(s, disks[i], rdust, drdust, Qsca)
+        if not settings.diskoff: disk_contrast_image = distribute_diskpoints(s, disks[i], rdust, drdust, Qsca)
         print('...done')
         # ----- END OF DISK IMAGING -----
         
@@ -293,7 +291,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
             for it in range(0,ntimes):
                 if it%16==0: print(it,ntimes)
                 # Integrate forward in time
-                desired_time = it * dt # dt is in years
+                desired_time = it * settings.dt # dt is in years
                 cart_end = nbody.nbody(cart0,GMvector,curr_time,desired_time)
                 curr_time = desired_time # update the time
                 
@@ -375,8 +373,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
                 l = np.sqrt(xx_helio + yy_helio + dz*dz)                                        # distance from point to telescope in AU
                 cosbeta = (-z_helio*(dstarAU-z_helio) + xx_helio + yy_helio) / (r_helio * l)    # cos(phase angle) calculated from a dot product
                 beta = np.arccos(cosbeta)                                                       # phase angle in radians
-                xpix = x_helio / pixscale_AU + npix/2. # convert to pixel coordinates
-                ypix = y_helio / pixscale_AU + npix/2.
+                xpix = x_helio / pixscale_AU + settings.npix/2. # convert to pixel coordinates
+                ypix = y_helio / pixscale_AU + settings.npix/2.
                 
                 planet_data[ip,1,:] = xpix # pixel coordinates
                 planet_data[ip,2,:] = ypix # pixel coordinates
@@ -528,8 +526,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
                     maxj = jlist[ilambda+1]
                     # Bin the stellar spectrum on the first pass
                     for jl in range(0,ntimes):
-                        planet_data[0,0,it] = it*dt # stellar coordinates
-                        planet_data[0,1:3,it] = [npix/2.,npix/2.]
+                        planet_data[0,0,it] = it * settings.dt # stellar coordinates
+                        planet_data[0,1:3,it] = [settings.npix/2.,settings.npix/2.]
                         integratedFp[ilambda,jl] = np.sum(fp[jl,minj:maxj+1] * pdnu[minj:maxj+1]) / np.sum(pdnu[minj:maxj+1]) # integrate over spectral channel and divide by total dnu
                     if ip==1:
                         fstarline[ilambda] = np.sum(fstarhires[minj:maxj+1] * pdnu[minj:maxj+1]) / np.sum(pdnu[minj:maxj+1])
@@ -558,11 +556,11 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
         hdr0.comments['DATE'] = 'Date and time created'
         hdr0['N_EXT'] = 3+tempnp
         hdr0.comments['N_EXT'] = 'Last extension' # need to add this to the main header to enable extensions
-        hdr0['SPECRES'] = specres
+        hdr0['SPECRES'] = settings.specres
         hdr0.comments['SPECRES'] = 'Spectral resolution for star and planet'
-        hdr0['LAMMIN'] = lambdamin
+        hdr0['LAMMIN'] = settings.lambdamin
         hdr0.comments['LAMMIN'] = 'Minimum wavelength (microns)'
-        hdr0['LAMMAX'] = lambdamax
+        hdr0['LAMMAX'] = settings.lambdamax
         hdr0.comments['LAMMAX'] = 'Maximum wavelength (microns)'
         hdr0['COMMENT'] = 'Stellar wavelength vector'
 
@@ -570,11 +568,11 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
 
         # HDU 1: WAVELENGTHS FOR DISK SPECTRUM
         hdr1 = fits.Header()
-        hdr1['SPECRES'] = specrdisk
+        hdr1['SPECRES'] = settings.specrdisk
         hdr1.comments['SPECRES'] = 'Spectral resolution of disk wavelengths'
-        hdr1['LAMMIN'] = lambdamin
+        hdr1['LAMMIN'] = settings.lambdamin
         hdr1.comments['LAMMIN'] = 'Minimum wavelength (microns)'
-        hdr1['LAMMAX'] = lambdamax
+        hdr1['LAMMAX'] = settings.lambdamax
         hdr1.comments['LAMMAX'] = 'Maximum wavelength (microns)'
         hdr1['COMMENT'] = 'Disk wavelength vector'
         
@@ -584,7 +582,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
         hdr2 = fits.Header()
         hdr2['NCOMP'] = ncomponents
         hdr2.comments['NCOMP'] = 'Number of disk components'
-        hdr2['PXSCLMAS'] = pixscale_mas
+        hdr2['PXSCLMAS'] = settings.pixscale_mas
         hdr2.comments['PXSCLMAS'] = 'Pixel scale (mas)'
 
         for icomp in range(0,ncomponents):
@@ -614,7 +612,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
             elif pd.isnull(s[ih]): hdr3[ih] = 'NaN'
             else: hdr3[ih] = s[ih]
             if ih in scomments: hdr3.comments[ih] = scomments[ih]
-        hdr3['PXSCLMAS'] = pixscale_mas
+        hdr3['PXSCLMAS'] = settings.pixscale_mas
         hdr3.comments['PXSCLMAS'] = 'Pixel scale (mas)'
         hdr3['COMMENT'] = 'Star data array'
         
@@ -632,7 +630,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
                 hdrn.comments[tag] = pcomments[pllabel[ih]]
             hdrn['ALBEDO_F'] = albedos[i][ip-1]
             hdrn.comments['ALBEDO_F'] = 'Geometric albedo file'
-            hdrn['PXSCLMAS'] = pixscale_mas
+            hdrn['PXSCLMAS'] = settings.pixscale_mas
             hdrn.comments['PXSCLMAS'] = 'Pixel scale (mas)'
             hdrn['COMMENT'] = 'Planet data array'
             
@@ -646,7 +644,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, **settings):
     return
 
 
-def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=npix, ywidth=npix):
+def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=settings.npix, ywidth=settings.npix):
     # Tolerance is set to give noise level at 1/3rd of faintest
     # detectable point source (dmag=26.5) at V band for a 4 m
     # telescope.
@@ -657,9 +655,9 @@ def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=n
     tol = min(tol,0.05)   # at least hit 5% precision even if nzodis is < 1
     tol0 = tol
 
-    # NOTE: pixscale_mas = 4.0 used for calibrating the exozodi.
+    # NOTE: use pixscale_mas = 4.0 used for calibrating the exozodi.
     
-    pixscale_arcsec = pixscale_mas / 1000.
+    pixscale_arcsec = settings.pixscale_mas / 1000.
     auperpix = pixscale_arcsec * s['dist']
     cosinc = np.cos(-s['I']*np.pi/180) # we want to rotate in opposite direction of inclination
     sininc = np.sin(-s['I']*np.pi/180)
@@ -673,8 +671,8 @@ def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=n
     xcenrot = rcen * np.cos(s['PA']*np.pi/180)
     ycenrot = rcen * np.sin(s['PA']*np.pi/180)
 
-    xcenpix = int(xcenrot/auperpix + npix/2)
-    ycenpix = int(ycenrot/auperpix + npix/2)
+    xcenpix = int(xcenrot/auperpix + settings.npix/2)
+    ycenpix = int(ycenrot/auperpix + settings.npix/2)
     xstart = xcenpix - int(np.ceil(xwidth/2))
     xend = xstart + xwidth
     ystart = ycenpix - int(np.ceil(ywidth/2))
@@ -686,7 +684,7 @@ def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=n
     # go far enough that expected SB drops to tol of peak
     
     zmax_radial = np.max(disk[:,dlabel.index('r')])*tol**(-2./7.) # based on n ~ r^-1.5 and 1/r^2 illumination factor
-    rmax = np.sqrt(2.)*(npix/2.0)*auperpix
+    rmax = np.sqrt(2.)*(settings.npix/2.0)*auperpix
     zmax_height = np.sqrt(-2 * (np.max(disk[:,dlabel.index('hor')]) * rmax)**2 * np.log(tol)) # exponential variation with z
 
     # We use zmax_height (z limit based on tol and opening angle of disk) 
@@ -695,7 +693,7 @@ def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=n
 
     zmax = zmax_radial # *abs(sininc) > zmax_height*abs(cosinc)
     
-    r,x0,y0 = rgen(npix,npix)
+    r,x0,y0 = rgen(settings.npix,settings.npix)
     x0 -= 0.5 # shift to 00LL convention
     y0 -= 0.5 # shift to 00LL convention
     x0 *= auperpix # convert to AUs
@@ -713,12 +711,12 @@ def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=n
     nsubarraypix = 1
     bksp = ''
     
-    if xstart<0 or xend>npix or ystart<0 or yend>npix:
+    if xstart<0 or xend>settings.npix or ystart<0 or yend>settings.npix:
         print('Error: disk sample area out of aperture.')
         exit()
     
     diskimage = wrapImage.PyImage()
-    diskimage.SetupImage(s['rstar'], s['Teff'], rdust_blowout, tsublimate, disk, rdust, drdust, Qsca)
+    diskimage.SetupImage(s['rstar'], s['Teff'], settings.rdust_blowout, settings.tsublimate, disk, rdust, drdust, Qsca)
     
     for ix in range(xstart,xend):
         maxnxy_used = 0
@@ -728,7 +726,7 @@ def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=n
             # this significantly improves run time
             # and memory usage, as most time is spent
             # on the central pixels
-            if r_arcsec[ix,iy] < iwa: tol = max(iwa_tol, tol0)
+            if r_arcsec[ix,iy] < settings.iwa: tol = max(settings.iwa_tol, tol0)
             else: tol = tol0
             
             nxy = 1     # (prevnxy-2) > long(1)

@@ -5,34 +5,15 @@ import numpy as np
 grav_const    = 4.*np.pi**2 # in AU^3 yr^-2 solar_mass^-1
 c = 2.998e8 / 1.496e11 * 365.25 * 24. * 60. * 60. # AU yr^-1
 planck = 6.62608e-27
-rdust_blowout = 0.5
-tsublimate    = 1500.
 
 # Default Settings
 
-pixscale      = 0.002
-pixscale_mas  = pixscale * 1000.
-iwa           = 0.015
-iwa_tol       = 0.1
-npix          = 250
-specres       = 300.
-specrdisk     = 10.
-lambdamin     = 0.3
-lambdamax     = 1.0
-
-nstars        = 1
-ncomponents   = 2
-nplanets      = 30
+maxnplanets   = 30
 mincomponents = 1 # Minimum number of disk components, warm dust / exo-zodi required
 maxcomponents = 3 # Maximum number of disk components, highest plausible is 3-4.
-timemax       = 1.e-10
-dt            = 10./365.25
 
-output_dir    = 'output'
 exovistapath  = './'
 lqq_dir       = 'lqq_files/'
-diskoff       = False # set to True to skip calculating the disk spectrum for fast testing
-serial        = False # catches the exception if multiprocessing is not available
 
 # Define debris disk grain sizes
 '''
