@@ -5,7 +5,6 @@ class Settings():
 
     # imaging and spectroscopy parameters
     pixscale:     float = 0.002
-    pixscale_mas: float = pixscale * 1000.
     iwa:          float = 0.015
     iwa_tol:      float = 0.1
     npix:           int = 250
@@ -49,3 +48,6 @@ class Settings():
     timemax:      float = 1.e-10
     dt:           float = 10./365.25
     output_dir:     str = 'output'
+
+    def __post_init__(self):
+        self.pixscale_mas = self.pixscale * 1000.
