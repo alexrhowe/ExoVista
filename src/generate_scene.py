@@ -91,7 +91,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
     # Define time array
     timemin = 0.
     if settings.timemax<=0.: settings.timemax = 1.e-10
-    ntimes = int(np.ceil((settings.timemax-timemin)/settings.dt))
+    ntimes = int(np.ceil((settings.timemax-timemin)/settings.dt)) + 1
     time_vector = np.linspace(timemin,settings.timemax,ntimes)
 
     # Define master wavelength array
@@ -185,7 +185,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         p = planets[i]
         j = np.where(p[:,pllabel.index('R')] > 0)
         tempnplanets = len(j[0])+1  # add 1 to include the star
-        planet_data = np.zeros((tempnplanets,15+nlambda,ntimes)) # this will hold all star + planet data vs time & wavelength
+        planet_data = np.zeros((tempnplanets,16+nlambda,ntimes)) # this will hold all star + planet data vs time & wavelength
         
         # if it's just the star, there's no integration to do
         # just fill in planet_data with the time and flux
@@ -201,6 +201,12 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             tempp = p[j]
             Mplanet = tempp[:,pllabel.index('M')]/332948.0 # mass of planets in solar masses
             Mvector = np.insert(Mplanet,0,s['mass'])  # all in solar masses
+
+            Rplanet = tempp[:,pllabel.index('R')]
+            starrad = np.sqrt(s['Lstar'] / (s['Teff']/5778.)**4) * 109.2
+            Rvector = np.insert(Rplanet,0,starrad)
+            Rvector *= 6.371e8/1.496e13
+            
             GMplanet = np.array(grav_const * Mplanet)
             GMvector = np.array(grav_const * Mvector)
             GMplanetpstar = GMplanet + grav_const * s['mass']
@@ -209,7 +215,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             for cd in keplist:
                 if cd in ['a','e']: kepcoords.append(tempp[:,pllabel.index(cd)])
                 else: kepcoords.append(tempp[:,pllabel.index(cd)]*np.pi/180.)
-            
+                
             # Convert orbital elements to heliocentric coordinates
             cart = coord.cartesian(GMplanetpstar, kepcoords)
             
@@ -242,6 +248,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             # toward the observer. To do this, we start with unit vectors
             # in the z direction, and rotate it using the same conventions
             # as cartesian.pro. Note we assume zero obliquity.
+            # NOTE: THIS SECTION IS USED ONLY FOR LAT-LON RESOLVED ALBEDOS.
+            # IT MAY ALSO BE MISSING AN ARGPERI ROTATION.
             x_uv0 = 0.       # a unit vector in the z direction
             y_uv0 = 0.
             z_uv0 = 1.
@@ -277,7 +285,6 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             # the latitude.
             platitude = np.arccos(z_uv0)/np.pi*180. # this sets latitude = 0 when pole-on...
             platitude = 90.-platitude # now we have -90 to +90, with +90 = North
-            
 
             # ----- INTEGRATE -----
             # Step through all time steps to do this.
@@ -287,12 +294,27 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
 
             cart0 = [x0,y0,z0,vx0,vy0,vz0]
             print('Integrating over time...')
-            
+
+            tlistfull = []
+            translistfull = []
+            for ip in range(0,tempnplanets-1): translistfull.append([])
+                        
             for it in range(0,ntimes):
                 if it%16==0: print(it,ntimes)
                 # Integrate forward in time
                 desired_time = it * settings.dt # dt is in years
-                cart_end = nbody.nbody(cart0,GMvector,curr_time,desired_time)
+                cart_end,tlist,transmaster = nbody.nbody(cart0,GMvector,Rvector,s['I'],curr_time,desired_time)
+                
+                x0 = cart_end[0]
+                y0 = cart_end[1]
+                z0 = cart_end[2]
+                vx0 = cart_end[3]
+                vy0 = cart_end[4]
+                vz0 = cart_end[5]
+                
+                tlistfull = tlistfull + tlist
+                for ip in range(0,tempnplanets-1): translistfull[ip] = translistfull[ip] + transmaster[ip]
+                
                 curr_time = desired_time # update the time
                 
                 # output coordinates are relative to the system plane
@@ -340,8 +362,41 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
                     else: # if it's a planet... 
                         planet_data[ip,3:9,it] = [tempa[ip-1],tempe[ip-1],tempi[ip-1],templongnode[ip-1],tempargperi[ip-1],tempmeananom[ip-1]] # record the heliocentric orbit
             #----- END OF INTEGRATION -----
-            
 
+            #----- COMPILE LIST OF TRANSITS AND ECLIPSES -----
+            tlistfinal = []
+            plistfinal = []
+            translist0 = []
+            translist1 = []
+            for ip in range(1,tempnplanets):
+                if translistfull[ip-1][0] != 0:
+                    tlistfinal.append(tlistfull[0]*365.25)
+                    plistfinal.append(ip)
+                    translist0.append(translistfull[ip-1][0])
+                    translist1.append(translistfull[ip-1][0])
+            
+            for it in range(1,len(tlistfull)):
+                for ip in range(1,tempnplanets):
+                    if translistfull[ip-1][it] != translistfull[ip-1][it-1]:
+                        tlistfinal.append(tlistfull[it]*365.25)
+                        plistfinal.append(ip)
+                        translist0.append(translistfull[ip-1][it-1])
+                        translist1.append(translistfull[ip-1][it])
+                        
+            for ip in range(1,tempnplanets):
+                if translistfull[ip-1][-1] != 0:
+                    tlistfinal.append(tlistfull[-1]*365.25)
+                    plistfinal.append(ip)
+                    translist0.append(translistfull[ip-1][-1])
+                    translist1.append(translistfull[ip-1][-1])
+                    
+            if len(tlistfinal)==0:
+                tlistfinal = [0.]
+                plistfinal = [0]
+                translist0 = [0]
+                translist1 = [0]
+            transits = np.array([np.array(tlistfinal),np.array(plistfinal),np.array(translist0),np.array(translist1)])
+            
             #----- CALCULATE FLUX -----
             '''
             The integration above was done by looping over
@@ -353,7 +408,6 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             Stellar flux vs time has already been recorded
             '''
             for ip in range(1,tempnplanets):
-                #print('Planet {0:d} of {1:d}...'.format(ip,tempnplanets-1))
                 # Calculate phase angle
                 xstar = planet_data[0,9,:]  # barycentric coordinates vs time
                 ystar = planet_data[0,10,:]
@@ -378,6 +432,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
                 
                 planet_data[ip,1,:] = xpix # pixel coordinates
                 planet_data[ip,2,:] = ypix # pixel coordinates
+                
+                planet_data[ip,15,:] = beta*180./np.pi # phase angle
                 
                 # Read the albedo file
                 # Upon return, phi could be undefined, phase angle, or differential longitude
@@ -526,17 +582,17 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
                     maxj = jlist[ilambda+1]
                     # Bin the stellar spectrum on the first pass
                     for jl in range(0,ntimes):
-                        planet_data[0,0,it] = it * settings.dt # stellar coordinates
-                        planet_data[0,1:3,it] = [settings.npix/2.,settings.npix/2.]
+                        planet_data[0,0,jl] = jl * settings.dt # stellar coordinates
+                        planet_data[0,1:3,jl] = [settings.npix/2.,settings.npix/2.]
                         integratedFp[ilambda,jl] = np.sum(fp[jl,minj:maxj+1] * pdnu[minj:maxj+1]) / np.sum(pdnu[minj:maxj+1]) # integrate over spectral channel and divide by total dnu
                     if ip==1:
                         fstarline[ilambda] = np.sum(fstarhires[minj:maxj+1] * pdnu[minj:maxj+1]) / np.sum(pdnu[minj:maxj+1])
                 if ip==1:
                     fstar[:] = fstarline
                     fstar = np.transpose(fstar)
-                    planet_data[0,15:15+nlambda,:] = fstar
+                    planet_data[0,16:16+nlambda,:] = fstar
                 cp = integratedFp / fstar             # convert to contrast by dividing by recorded fstar
-                planet_data[ip,15:15+nlambda,:] = cp  # contrast
+                planet_data[ip,16:16+nlambda,:] = cp  # contrast
             
         # ----- END OF FLUX CALCULATION -----
                 
@@ -554,6 +610,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
 
         hdr0['DATE'] = str(datetime.now())
         hdr0.comments['DATE'] = 'Date and time created'
+        hdr0['VERSION'] = 2.2
+        hdr0.comments['VERSION'] = 'Version of code used; used for post-processing scripts.'
         hdr0['N_EXT'] = 3+tempnp
         hdr0.comments['N_EXT'] = 'Last extension' # need to add this to the main header to enable extensions
         hdr0['SPECRES'] = settings.specres
@@ -603,6 +661,13 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
 
         # arrays must be transposed for backward compatibility with IDL outputs
         hdu2 = fits.ImageHDU(disk_contrast_image.T, header=hdr2)
+
+        # HDU T: LIST OF TRANSITS AND ECLIPSES
+        hdrt = fits.Header()
+        hdrt['BASELINE'] = settings.timemax*365.25
+        hdrt.comments['BASELINE'] = 'Length of baseline (days)'
+        
+        hdut = fits.ImageHDU(transits, header=hdrt)
         
         # HDU 3: STAR PROPERTIES
         hdr3 = fits.Header()
@@ -618,7 +683,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         
         hdu3 = fits.ImageHDU(planet_data[0].T, header=hdr3)
         
-        hdul = fits.HDUList([hdu0, hdu1, hdu2, hdu3])
+        hdul = fits.HDUList([hdu0, hdu1, hdu2, hdut, hdu3])
 
         # HDRN: PLANET PROPERTIES
         for ip in range(1,len(planet_data)):
@@ -1011,9 +1076,6 @@ def getkurucz(teff, logg, metallicity=0.0):
     if tindex<0: tindex = 0
     if tindex>=len(tvec)-1: tindex = len(tvec)-2
     ft = (teff_model - tvec[tindex]) / (tvec[tindex+1] - tvec[tindex])
-
-    print(logg,logg_model,gindex,len(gvec))
-    print(teff,teff_model,tindex,len(tvec))
     
     Bnu00 = np.zeros(len(lam))
     Bnu01 = np.zeros(len(lam))

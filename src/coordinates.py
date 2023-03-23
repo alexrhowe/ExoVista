@@ -129,7 +129,7 @@ def keplerian(GM, cartcoords):
     rsinu = (y * cosnode - x * sinnode)/np.cos(i)
     
     u = i * 0.0 # zero by default
-    j = [j for j in range(0,len(rsinu)) if rsinu[j] != 0 or rcosu != 0]
+    j = [j for j in range(0,len(rsinu)) if rsinu[j] != 0 or rcosu[j] != 0]
     u[j] = np.arctan2(rsinu[j], rcosu[j])
     
     argperi = (u - trueanom) % (2.*np.pi)

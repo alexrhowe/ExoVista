@@ -8,7 +8,6 @@ from src.constants import *
 from src import Settings
 
 settings = Settings.Settings()
-rng = np.random.default_rng()
 
 def generate_disks(stars, planets, settings, nexozodis=None, rand_components=False):
 

@@ -5,7 +5,7 @@ Image::Image(double rs, double Te, double rdb, double ts, vector<vector<double> 
 {
   rstar = rs;
   Teff = Te;
-    rdust_blowout = rdb;
+  rdust_blowout = rdb;
   tsublimate = ts;
   disk = di;
   rdust = rd;

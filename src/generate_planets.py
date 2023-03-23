@@ -6,8 +6,6 @@ from src import Settings
 
 settings = Settings.Settings()
 
-rng = np.random.default_rng()
-
 # Read in bins for planet types.
 fbound = open('planetbins.dat','r')
 line = fbound.readline().strip()
@@ -15,7 +13,6 @@ if line!='Radius':
     print('Error: wrong format in planetbins.dat')
     exit()
 rbound = np.array(fbound.readline().split()).astype(float)
-
 
 atype = fbound.readline().strip()
 alines = fbound.readlines()
@@ -189,7 +186,7 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
         prev_nplanets = nplanets
      
         # First, add some random planets based on occurrence rates
-        plorb, hillsphere_flag = add_planets(stars, plorb, expected, medge, aedge, hillsphere_flag)
+        plorb, hillsphere_flag = add_planets(stars, plorb, expected, medge, aedge, hillsphere_flag, rng)
 
         # Number of stars with new planets
         nnew = len(np.where(hillsphere_flag)[0])
@@ -226,14 +223,14 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
     
     # Randomly assign all planets an albedo file
     print('Assigning planet types/albedos based on rules in assign_albedo_file()')
-    albedos = assign_albedo_file(stars, plorb)
+    albedos = assign_albedo_file(stars, plorb, rng)
 
     # if True, adds a zero-mass Earth twin at quadrature for yield calculations
     if addearth:
         for i in range(0,nstars):
             inew = len(np.where(plorb[i,:,pllabel.index('R')] > 0)[0])
             anew = np.sqrt(stars['Lstar'].iloc[i])
-            plorb[i,inew] = np.array([1.e-6,1.,anew,0.01671,0.01,-11.261,114.208,90.0])
+            plorb[i,inew] = np.array([1.e-6,1.,anew,0.00,0.0005,-11.261,114.208,-102.947])
             albedos[i].append('Earth')
             
     print('generate_planets() done')
@@ -380,8 +377,7 @@ def load_occurrence_ratesMA(filename, subdivide=1, usebins=False):
     return newoccrate, medge, aedge, mmid, amid
 
 
-def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag):
-    
+def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, rng):
     plorb = plorb
     nstars = len(stars)
     hillsphere_flag = np.full(len(hillsphere_flag),False) # reset this flag to no recalculation for all stars
@@ -528,14 +524,14 @@ def remove_unstable_planets(stars, plorb, hillsphere_flag):
     return plorb
 
 
-def assign_albedo_file(stars, plorb):
+def assign_albedo_file(stars, plorb, rng):
     '''
     Here we assign random albedo files to the grid of planets
     Note that this is currently designed to only do this in 
     stellar-flux space, i.e. models are selected based on
     stellar radiation received from planet, not absolute 
     semi-major axis
-    '''
+    '''    
     nstars = len(stars)    
     plalbedo = []
     

@@ -1,17 +1,16 @@
 import numpy as np
 
-# Fixed constants
-
+# Physical constants
 grav_const    = 4.*np.pi**2 # in AU^3 yr^-2 solar_mass^-1
 c = 2.998e8 / 1.496e11 * 365.25 * 24. * 60. * 60. # AU yr^-1
 planck = 6.62608e-27
 
-# Default Settings
-
+# Data structure parameters
 maxnplanets   = 30
 mincomponents = 1 # Minimum number of disk components, warm dust / exo-zodi required
 maxcomponents = 3 # Maximum number of disk components, highest plausible is 3-4.
 
+# File paths
 exovistapath  = './'
 lqq_dir       = 'lqq_files/'
 
@@ -46,6 +45,7 @@ master_rdust_boundaries = np.array([0.1000, 0.1216, 0.1480, 0.1800, 0.2190, 0.26
 master_nsizes = len(master_rdust_boundaries)
 master_drdust = master_rdust_boundaries[1:master_nsizes]-master_rdust_boundaries[0:master_nsizes-1]
 
+# Table headings
 starbase = {'ID':0, 'HIP':0, 'TYC2':'', 'dist':10., 'M_V':0., 'Vmag':0., 'Bmag':0., 'Umag':float('nan'), 'Rmag':float('nan'), 'Imag':float('nan'), 'Jmag':float('nan'), 'Hmag':float('nan'), 'Kmag':float('nan'), 'Type':'', 'Lstar':0., 'logg':0., 'Teff':0., 'angdiam':0., 'mass':0., 'rstar':0., 'PA':0., 'I':60.}
 intlist = ['ID', 'HIP']
 strlist = ['TYC2', 'WDS', 'Type']
@@ -53,6 +53,7 @@ keplist = ('a','e','i','longnode','argperi','meananom')
 pllabel = ('M','R','a','e','i','longnode','argperi','meananom')
 dlabel = ('n', 'longnode', 'i', 'nzodis', 'r', 'dror', 'rinner', 'eta', 'hor', 'g0', 'g1', 'g2', 'w0', 'w1', 'w2')
 
+# FITS file comments
 scomments = {'PA':'System midplane position angle (deg)',
              'I':'System midplane inclination (deg)',
              'ID':'Internal catalog #',

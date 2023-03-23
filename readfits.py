@@ -18,7 +18,7 @@ plt.style.use('dark_background')
 plt.rcParams['animation.embed_limit'] = 2**128
 
 lambda_ref    = 0.50  # reference wavelength in microns
-mirror_size   = 6.7   # mirror diameter in meters
+mirror_size   = 8.0   # mirror diameter in meters
 disk_gain     = 1.0   # multiplies the brightness of the disk image
 log_disk      = False # color the disk brightness on a logarithmic scale
 planet_bright = False # scale planet brightnesses based on their positions on their phase curves

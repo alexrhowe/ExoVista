@@ -32,17 +32,29 @@ def load_scene(inputfile, time = 0):
     if len(hdul) < 4:
         print('Error missing extensions in FITS file.')
         exit()
-    notime = False
-    if hdul[3].data.ndim == 1: notime==True
-    nplanets = len(hdul)-4
-    if(abs(hdul[-1].header['A']-1)<1.e-5): nplanets -= 1 # remove the extra Earth twin if it is present
+
+    version = 0.
+    if 'VERSION' in hdul[0].header:
+        version = hdul[0].header['VERSION']
+    
+    if version <= 2.1:
+        specstart = 15
+        hstar = 3
+    else:
+        specstart = 16
+        hstar = 4
+        
+    specstart = 16 # temp for the current batch of files
+    
+    nplanets = len(hdul)-hstar
+    if(abs(hdul[-1].header['A']/np.sqrt(hdul[hstar].header['LSTAR'])-1)<1.e-5): nplanets -= 1 # remove the extra Earth twin if it is present
 
     #Define extension numbers
     lam_ext = 0
     disklam_ext = 1
     disk_ext = 2
-    star_ext = 3
-    planet_ext = 4 #first planet extension
+    star_ext = hstar
+    planet_ext = hstar+1 #first planet extension
     h = astropy.io.fits.getheader(inputfile, ext=0) #read header of first extension
     n_ext = h['N_EXT'] #get the largest extension #
 
@@ -65,7 +77,7 @@ def load_scene(inputfile, time = 0):
     
     xystar[0] = x[0] # pick the first entry by default
     xystar[1] = y[0]
-    fstar = d[0,15:15+nlambda] # grab the stellar flux of first time entry
+    fstar = d[0,specstart:specstart+nlambda] # grab the stellar flux of first time entry
     
     # If the fits file contains a vector of times, interpolate...
     if len(t) > 1: 
@@ -75,7 +87,7 @@ def load_scene(inputfile, time = 0):
         xystar[1] = y_interp(time)
         
         for ii in range(nlambda):
-            fstar_interp = scipy.interpolate.interp1d(t, d[:,15+ii], kind='quadratic')
+            fstar_interp = scipy.interpolate.interp1d(t, d[:,specstart+ii], kind='quadratic')
             fstar[ii] = fstar_interp(time)
             
     #STEP 2: PLANETS
@@ -91,7 +103,7 @@ def load_scene(inputfile, time = 0):
         
         xyplanet[ip,0] = x[0] # pick the first entry by default 
         xyplanet[ip,1] = y[0]
-        contrast = d[0,15:15+nlambda]
+        contrast = d[0,specstart:specstart+nlambda]
         fplanet[ip,:] = contrast * fstar #convert to flux
                 
         if len(t) > 1:
@@ -101,7 +113,7 @@ def load_scene(inputfile, time = 0):
             xyplanet[ip,1] = y_interp(time)
             
             for ii in range(nlambda):
-                contrast_interp = scipy.interpolate.interp1d(t, d[:,15+ii], kind='quadratic')
+                contrast_interp = scipy.interpolate.interp1d(t, d[:,specstart+ii], kind='quadratic')
                 contrast = contrast_interp(time)
                 fplanet[ip, ii] = contrast * fstar[ii]
                 
