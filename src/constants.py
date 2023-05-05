@@ -46,9 +46,9 @@ master_nsizes = len(master_rdust_boundaries)
 master_drdust = master_rdust_boundaries[1:master_nsizes]-master_rdust_boundaries[0:master_nsizes-1]
 
 # Table headings
-starbase = {'ID':0, 'HIP':0, 'TYC2':'', 'dist':10., 'M_V':0., 'Vmag':0., 'Bmag':0., 'Umag':float('nan'), 'Rmag':float('nan'), 'Imag':float('nan'), 'Jmag':float('nan'), 'Hmag':float('nan'), 'Kmag':float('nan'), 'Type':'', 'Lstar':0., 'logg':0., 'Teff':0., 'angdiam':0., 'mass':0., 'rstar':0., 'PA':0., 'I':60.}
+starbase = {'ID':0, 'HIP':0, 'TYC2':'', 'dist':10., 'M_V':0., 'Vmag':0., 'Bmag':0., 'Umag':float('nan'), 'Rmag':float('nan'), 'Imag':float('nan'), 'Jmag':float('nan'), 'Hmag':float('nan'), 'Kmag':float('nan'), 'Type':'', 'Lstar':0., 'logg':0., 'Teff':0., 'angdiam':0., 'mass':0., 'rstar':0., 'RA':0., 'Dec':0., 'pmRA':0., 'pmDec':0., 'PA':0., 'I':60., 'Spectrum':None}
 intlist = ['ID', 'HIP']
-strlist = ['TYC2', 'WDS', 'Type']
+strlist = ['TYC2', 'WDS', 'Type', 'Spectrum']
 keplist = ('a','e','i','longnode','argperi','meananom')
 pllabel = ('M','R','a','e','i','longnode','argperi','meananom')
 dlabel = ('n', 'longnode', 'i', 'nzodis', 'r', 'dror', 'rinner', 'eta', 'hor', 'g0', 'g1', 'g2', 'w0', 'w1', 'w2')

@@ -12,9 +12,10 @@ class Settings():
     specrdisk:    float = 10.
     lambdamin:    float = 0.3
     lambdamax:    float = 1.0
-
+    hires:         bool = False    # set to True to use the planet spectrum resolution for the disk
+    
     # planet population parameters
-    seed:           int = None       # RNG seed
+    seed:           int = None     # RNG seed
     emin:         float = 0.
     emax:         float = 0.
     imin:         float = 0.
@@ -23,7 +24,9 @@ class Settings():
     sysimax:      float = 180.
     sysPAmin:     float = 0.
     sysPAmax:     float = 360.    
-    eecprob:      float = 1.0     # Probability that a planet in the EEC bounding box is an EEC.
+    eecprob:      float = 1.0      # probability that a planet in the EEC bounding box is an EEC
+    randphase:     bool = False    # set to True to add a spread to the phase functions
+    randrad:       bool = False    # set to True to add a spread to the mass-radius relation
 
     # disk model parameters
     ncomponents:     int = 2
@@ -48,6 +51,7 @@ class Settings():
     timemax:      float = 1.e-10
     dt:           float = 10./365.25
     output_dir:     str = 'output'
-
+    
     def __post_init__(self):
         self.pixscale_mas = self.pixscale * 1000.
+        if self.hires: self.specrdisk = self.specres

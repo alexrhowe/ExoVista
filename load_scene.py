@@ -94,8 +94,8 @@ def load_scene(inputfile, time = 0):
     #;Need to determine x, y, and fplanet
     xyplanet = np.zeros((nplanets,2))
     fplanet = np.zeros((nplanets,nlambda))
-    for ip in range(nplanets): #loop over all planets
-        d, h = astropy.io.fits.getdata(inputfile, ext=planet_ext+ip, header=True)
+    for ip in range(1,nplanets): #loop over all planets
+        d, h = astropy.io.fits.getdata(inputfile, ext=hstar+ip, header=True)
         if d.ndim == 1: d = np.expand_dims(d, 0)
         t = d[:,0] # time vector
         x = d[:,1] # heliocentric x position vector (pix)

@@ -26,14 +26,22 @@ for i in range(0,len(alines)):
 if atype=='Flux': abound = 1./np.sqrt(abound)
 
 
-def mass_to_radius(M):
+def mass_to_radius(M, rng, randrad=False):
     # Calculates radius in Earth radii based on Chen & Kipping (2017)
     R = 1.008 * M**0.279
+    
     j = np.where(M>2.04)[0]
+    i = np.where(M<=2.04)[0]
+    if randrad: R[i] *= rng.lognormal(sigma = np.log(1.0403), size = len(i))
     R[j] = 1.008 * 2.04**0.279 * (M[j]/2.04)**0.589
+    
     j = np.where(M>131.6)[0]
+    i = [k for k in range(0,len(M)) if M[k]>2.04 and M[k]<=131.6]
+    if randrad: R[i] *= rng.lognormal(sigma = np.log(1.146), size = len(i))
     R[j] = 1.008 * 2.04**0.279 * (131.6/2.04)**0.589 * (M[j]/131.6)**-0.044
-
+         
+    if randrad: R[j] *= rng.lognormal(sigma = np.log(1.0737), size = len(j))
+    
     return R
 
 
@@ -75,6 +83,10 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
     # Check that "stars" has the necessary tags
     if 'Lstar' not in stars.head():
         print('Error: stars input must be a DataFrame including column \"Lstar\"')
+        return
+
+    if usebins and settings.randrad:
+        print('Error: usebins keyword is not compatible with the randomized mass-radius relation (randrad)')
         return
     
     # Define planet structure entry, as described below
@@ -186,7 +198,7 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
         prev_nplanets = nplanets
      
         # First, add some random planets based on occurrence rates
-        plorb, hillsphere_flag = add_planets(stars, plorb, expected, medge, aedge, hillsphere_flag, rng)
+        plorb, hillsphere_flag = add_planets(stars, plorb, expected, medge, aedge, hillsphere_flag, settings.randrad, rng)
 
         # Number of stars with new planets
         nnew = len(np.where(hillsphere_flag)[0])
@@ -377,7 +389,7 @@ def load_occurrence_ratesMA(filename, subdivide=1, usebins=False):
     return newoccrate, medge, aedge, mmid, amid
 
 
-def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, rng):
+def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, randrad, rng):
     plorb = plorb
     nstars = len(stars)
     hillsphere_flag = np.full(len(hillsphere_flag),False) # reset this flag to no recalculation for all stars
@@ -453,7 +465,7 @@ def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, r
                 iref += ntemp
     
     # Calculate radius in Earth radii based on Chen & Kipping (2017)
-    temp_planets[:,pllabel.index('R')] = mass_to_radius(temp_planets[:,pllabel.index('M')])
+    temp_planets[:,pllabel.index('R')] = mass_to_radius(temp_planets[:,pllabel.index('M')], randrad, rng)
     
     # Randomly assign to stars and sort by semi-major axis
     starindices = np.vectorize(int)(rng.random(nplanets) * nstars)

@@ -8,7 +8,7 @@ from src import generate_scene
 from src import read_solarsystem
 from src import Settings
 
-# ExoVista v2.1
+# ExoVista v2.3
 
 # Generates a universe of simulated planetary systems based on a stellar target list.
 
@@ -33,10 +33,11 @@ if __name__ == '__main__':
     
     if parallel:
         cores = min(maxcores,os.cpu_count())
+        cores = min(cores,len(stars))
         percore = int(np.ceil(len(stars)/cores))
+        if percore > 1 and percore*(cores-1) >= len(stars): percore -= 1
+        
         pool = multiprocessing.Pool(cores)
-
-        if len(stars)<cores: cores = len(stars)
         
         inputs = []
         for i in range(0,cores):

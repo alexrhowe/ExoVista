@@ -7,7 +7,7 @@ import os
 import sys
 import time
 
-filename = 'output/-1-HIP_-TYC_SUN-mv_4.83-L_1.00-d_10.00-Teff_5778.00.fits'
+filename = '999-HIP_-TYC_SUN-mv_4.83-L_1.00-d_10.00-Teff_5778.00.fits'
 
 planetcolors = {'Archean_Earth':(0.0,1.0,0.0),'Earth':(0.0,1.0,0.0),'Hazy_Archean_Earth':(0.0,1.0,0.0),'Proterozoic_Earth-hi_o2':(0.0,1.0,0.0),
                 'Proterozoic_Earth-lo_o2':(0.0,1.0,0.0),'Venus':(1.0,1.0,0.0),'Mars':(1.0,0.0,0.0),'Early_Mars':(1.0,0.0,0.0),
@@ -21,7 +21,7 @@ lambda_ref    = 0.50  # reference wavelength in microns
 mirror_size   = 8.0   # mirror diameter in meters
 disk_gain     = 1.0   # multiplies the brightness of the disk image
 log_disk      = False # color the disk brightness on a logarithmic scale
-planet_bright = False # scale planet brightnesses based on their positions on their phase curves
+planet_bright = False # scale planet brightnesses relative to the maxima of their phase curves
 color_code    = False # color-code the planets based on type
 fitsdir = './output'  # directory of FITS files
 
@@ -29,7 +29,12 @@ filename = ''
 
 if len(sys.argv)>1:
     filename = sys.argv[1]
-else:
+    try: hdul = fits.open(filename)
+    except:
+        print('Error: file not found or in wrong format.')
+        filename = ''
+        
+if filename == '':
     print('Listing available files in FITS file directory...')
     time.sleep(2)
     fitslist = []
@@ -39,48 +44,58 @@ else:
     fitslist = sorted(fitslist)
     
     for i in range(0,len(fitslist)): print(i, fitslist[i]) # print the list with indices if you need it
-    print('Enter file number or other file name.')
-    filenum = input()
 
-    try:
-        filenum = int(filenum)
-        filename = fitslist[filenum]
-    except:
-        filename = filenum
+    while not os.path.exists(filename):
+        print('Enter file number or other file name.')
+        filenum = input()
+        
+        try:
+            filenum = int(filenum)
+            filename = fitslist[filenum]
+        except:
+            filename = filenum
 
-try: hdul = fits.open(filename)
-except:
-    print('Error: file not found.')
-    exit()
-hdul.info()
+        try:
+            hdul = fits.open(filename)
+            hdul.info()
+        except:
+            print('Error: file not found or in wrong format.')
+            filename = ''
+
 
 # Check whether FITS file is complete.
 if len(hdul) < 4:
     print('Error: missing extensions in FITS file.')
     exit()
 
-# Check whether multiple timesteps exist.
-notime = False
-if hdul[3].data.ndim > 1:
-    ntimes = len(hdul[3].data)
-    npoints = len(hdul[3].data[0])
+# Check version number for backwards compatibility.
+version = 0.
+if 'VERSION' in hdul[0].header:
+    version = hdul[0].header['VERSION']
+
+if version <= 2.1:
+    specstart = 15
+    hstar = 3
 else:
-    notime = True
-    ntimes = 1
-    npoints = len(hdul[3].data)
+    specstart = 16
+    hstar = 4
+
+specstart = 16 # temp for the current batch of files
     
-nplanets = len(hdul)-4
-if(abs(hdul[-1].header['A']-1)<1.e-5): nplanets -= 1 # remove the extra Earth twin if it is present
+speclen = len(hdul[0].data)
+
+if hdul[hstar].data.ndim > 1:
+    ntimes = len(hdul[hstar].data)
+    npoints = len(hdul[hstar].data[0])
+    
+nplanets = len(hdul)-hstar
+if(abs(hdul[-1].header['A']/np.sqrt(hdul[hstar].header['LSTAR'])-1)<1.e-5): nplanets -= 1 # remove the extra Earth twin if it is present
 
 stardata = np.zeros((ntimes,npoints))
 planetdata = np.zeros((nplanets,ntimes,npoints))
 
-if notime:
-    stardata = np.expand_dims(hdul[3].data, axis=0)
-    for i in range(0,nplanets): planetdata[i] = np.expand_dims(hdul[i+4].data, axis=0)
-else:
-    stardata = hdul[3].data
-    for i in range(0,nplanets): planetdata[i] = hdul[i+4].data
+stardata = hdul[hstar].data
+for i in range(1,nplanets): planetdata[i-1] = hdul[i+hstar].data # note here and later that counting starts from 1 because it's counted from hstar
 
 # Plot 1: Image of disk and planets marked by brightness relative to full phase
 
@@ -109,15 +124,15 @@ ax.set_xlim(0,250)
 ax.set_ylim(0,250)
 plt.subplots_adjust(left=0.001, bottom=0.001, right=0.999, top=0.999, wspace=0, hspace=0)
 
-xc = np.arange(0,250)
-yc = np.arange(0,250)
+xc = np.arange(0,251)
+yc = np.arange(0,251)
 ax.pcolor(xc,yc,disk,cmap='inferno')
 
 coords = np.zeros((nplanets,2,ntimes))
 
-for i in range(0,nplanets):
-    coords[i,0,:] = planetdata[i,:,1]
-    coords[i,1,:] = planetdata[i,:,2]
+for i in range(1,nplanets):
+    coords[i-1,0,:] = planetdata[i-1,:,1]
+    coords[i-1,1,:] = planetdata[i-1,:,2]
 
 line, = ax.plot([], [])
 dots = []
@@ -133,16 +148,16 @@ minbright = starbright-15.
 
 albedos = []
 plbright = np.zeros((nplanets,ntimes))
-for i in range(0,nplanets):
-    plbright[i] = planetdata[i,:,ilam]
-    plbright[i] /= np.max(plbright[i])  # normalize each planet's brightness to the maximum over its orbit
-    albedos.append(hdul[i+4].header['ALBEDO_F'])
+for i in range(1,nplanets):
+    plbright[i-1] = planetdata[i-1,:,ilam]
+    plbright[i-1] /= np.max(plbright[i-1])  # normalize each planet's brightness to the maximum over its orbit
+    albedos.append(hdul[i+hstar].header['ALBEDO_F'])
 
-for i in range(0,nplanets):
-    x = planetdata[i,0,1]
-    y = planetdata[i,0,2]
+for i in range(1,nplanets):
+    x = planetdata[i-1,0,1]
+    y = planetdata[i-1,0,2]
     if (x-125)**2 + (y-125)**2 <= (loD*1.5)**2: continue
-    bright = plbright[i,0]
+    bright = plbright[i-1,0]
     dots[i].set_data([x],[y])
     
     # Set planet colors
@@ -154,7 +169,6 @@ for i in range(0,nplanets):
         newcolor = tuple([bright*x for x in planetcolors[albedos[i]]])
     
     dots[i].set_color(newcolor)
-
 plt.style.use('default')
 
 # Plot 2: Disk brightness profile along the x-axis
@@ -174,27 +188,58 @@ ax2.plot(x,y)
 wave = hdul[0].data
 fig3 = plt.figure()
 ax3 = fig3.add_subplot(111)
-for i in range(0,nplanets):
-    spec = planetdata[i,0,15:]
+for i in range(1,nplanets):
+    spec = planetdata[i-1,0,specstart:]
     ax3.plot(wave,spec,label='Planet {0:d}'.format(i))
 plt.legend()
 
 # Plot 4: Contrast phase curves of the planets at the reference wavelength
-# Will be blank if there is only one timestep.
 
-if not notime:
-    ptime = stardata[:,ilam+15]
-    time = np.arange(len(ptime))*10
+ptime = stardata[:,ilam+15]
+time = np.arange(len(ptime))*10
+
+fig4 = plt.figure()
+ax4 = fig4.add_subplot(111)
+for i in range(1,nplanets):
+    ptime = planetdata[i-1,:,ilam+specstart]
+    ax4.plot(time,ptime,label='Planet {0:d}'.format(i))
+plt.legend()
+
+# Plot 5: 2-D trajectories of the planets on the plane of the sky
+
+fig5 = plt.figure()
+ax5 = fig5.add_subplot(111)
+for i in range(1,nplanets):
+    xtime = planetdata[i-1,:,1]
+    ytime = planetdata[i-1,:,2]
+    ax5.plot(xtime,ytime,label='Planet {0:d}'.format(i))
+    ax5.plot(125,125,'o',c='k',markersize=10)
+
+# Printing a list of transit and eclipse events
     
-    fig4 = plt.figure()
-    ax4 = fig4.add_subplot(111)
-    for i in range(0,nplanets):
-        ptime = planetdata[i,:,ilam+15]
-        ax4.plot(time,ptime,label='Planet {0:d}'.format(i))
-    plt.legend()
-    #fig4.savefig('phase_curves.png')
+if version >= 2.2:
+    transits = hdul[3].data
+    if len(transits[0])==1 and transits[0,0] == 0.:
+        print('No transits or eclipses.')
+    else:
+        print('Transit and Eclipse Event List')
+        for i in range(0,len(transits[0])):
+            event = ''
+            if transits[2,i]+transits[3,i]>0: event='transit'
+            if transits[2,i]+transits[3,i]<0: event='eclipse'
+            if transits[2,i]==0:
+                print('Planet {0:d} {1:s} ingress at {2:.2f} days'.format(int(transits[1,i]),event,transits[0,i]))
+            elif transits[3,i]==0:
+                print('Planet {0:d} {1:s}  egress at {2:.2f} days'.format(int(transits[1,i]),event,transits[0,i]))
+            elif transits[2,i]==transits[3,i]:
+                print('Planet {0:d} {1:s} in progress at {2:.2f} days'.format(int(transits[1,i]),event,transits[0,i]))
+            else: print('Error in event format at {2:.2f} days'.format(transits[0,i]))
 
-#fig.savefig('disk_image.png')
-#fig2.savefig('disk_profile.png')
-#fig3.savefig('planet_spectra.png')
+'''
+fig.savefig('disk_image.png')
+fig2.savefig('disk_profile.png')
+fig3.savefig('planet_spectra.png')
+fig4.savefig('phase_curves.png')
+fig5.savefig('planet_motions.png')
+'''
 plt.show()

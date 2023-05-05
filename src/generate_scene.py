@@ -17,7 +17,7 @@ from src import Settings
 
 settings = Settings.Settings()
 
-def load_lqsca(lqq_dir, composition, rdust, rdust_boundaries, lam):    
+def load_lqsca(lqq_dir, composition, rdust, rdust_boundaries, lam):
     '''
     lqq_dir: directory (including /) of lqq files
     composition: composition of dust (string)
@@ -61,6 +61,51 @@ def load_lqsca(lqq_dir, composition, rdust, rdust_boundaries, lam):
             print(i, lqq_file)
             exit()
     return Qsca_array
+
+def load_lqabs(lqq_dir, composition, rdust, rdust_boundaries, lam):    
+    '''
+    lqq_dir: directory (including /) of lqq files
+    composition: composition of dust (string)
+    rdust: grain size in microns
+    rdust_boundaries: upper and lower limits of rdust bin in microns
+    lam: desired wavelengths in microns
+    Qsca: returned nsizes x nlambda array
+    '''
+    
+    nsizes = len(rdust)
+    nlambda = len(lam)
+    Qabs_array = np.zeros((nsizes,nlambda))
+
+    for i in range(0,nsizes):
+    
+        lqq_file = lqq_dir + composition + '/' + composition + '-s_{0:.4f}-smin_{1:.4f}-smax_{2:.4f}-dnds~s^-3.5.lqq'.format(rdust[i],rdust_boundaries[i],rdust_boundaries[i+1])
+        
+        # read the file
+        fin = open(lqq_file,'r')
+        head = fin.readline()
+        fin.readline()
+        d = fin.readlines()
+        dlen = len(d)
+
+        l = np.zeros(dlen)
+        qabs = np.zeros(dlen)
+        for j in range(0,dlen):
+            line = d[j].split()
+            l[j] = float(line[0])
+            qabs[j] = float(line[2])
+            if np.isnan(qabs[j]): qabs[j] = qabs[j-1] # Handles errors that appear in the last line of some of the files.
+
+        # interpolate to desired wavelengths
+        f = interpolate.interp1d(l,qabs,kind='cubic')
+        Qabs_array[i] = f(lam)
+        
+        if np.isnan(Qabs_array[i,0]):
+            print('Error in Qsca file:')
+            print(Qabs_array[i])
+            print(qabs)
+            print(i, lqq_file)
+            exit()
+    return Qabs_array
         
 def lambertian(beta):
     # Returns the value of the Lambert phase function
@@ -80,6 +125,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
     +z coordinate points toward the observer (out of page)
     '''
     settings = settings
+    rng = np.random.default_rng(settings.seed)
     
     pixscale_arcsec = settings.pixscale
     if settings.output_dir == 'output': print('Default output directory: ./output/')
@@ -93,7 +139,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
     if settings.timemax<=0.: settings.timemax = 1.e-10
     ntimes = int(np.ceil((settings.timemax-timemin)/settings.dt)) + 1
     time_vector = np.linspace(timemin,settings.timemax,ntimes)
-
+    
     # Define master wavelength array
     dlnlambda = 1./settings.specres
     lnlambdamax = np.log(settings.lambdamax)
@@ -119,6 +165,21 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
     nstars = len(stars)
     ncomponents = len(disks[0])
     nplanets = len(planets[0])
+
+    # Set up spread in phase functions
+    fphase = open('phase_spread.dat','r')
+    fphase.readline()
+    lines = fphase.readlines()
+    phases = np.zeros(len(lines))
+    phaselo = np.zeros(len(lines))
+    phasehi = np.zeros(len(lines))
+    for i in range(0,len(lines)):
+        line = lines[i].split()
+        phases[i] = float(line[0])*np.pi/180.
+        phaselo[i] = float(line[1])
+        phasehi[i] = float(line[2])
+    fphaselo = interp1d(phases,phaselo,kind='cubic')
+    fphasehi = interp1d(phases,phasehi,kind='cubic')
     
     for i in range(0,len(stars)):
         
@@ -141,7 +202,9 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         if s['HIP'] > 0: hiptag = s['HIP']
         if settings.output_dir[0] == '/': tempdir = settings.output_dir
         else: tempdir = './' + settings.output_dir # if output_dir is relative or absolute
-        if 'TYC2' in stars.columns:
+        if settings.hires:
+            fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-HIRES-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])            
+        elif 'TYC2' in stars.columns:
             fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-TYC_' + str(s['TYC2']) + '-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])
         else:
             fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])
@@ -187,9 +250,13 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         tempnplanets = len(j[0])+1  # add 1 to include the star
         planet_data = np.zeros((tempnplanets,16+nlambda,ntimes)) # this will hold all star + planet data vs time & wavelength
         
+        if 'Spectrum' in s.keys() and type(s['Spectrum']) == str and path.exists(s['Spectrum']):
+            hires, fstarhires = get_stellar_flux(s,lam,path=exovistapath,spectrum=s['Spectrum'])
+        else:
+            hires, fstarhires = get_stellar_flux(s,lam,path=exovistapath)
+        
         # if it's just the star, there's no integration to do
         # just fill in planet_data with the time and flux
-        hires, fstarhires = get_stellar_flux(s,lam,path=exovistapath)
         nhires = len(hires)
         pnu = (2.998e14)/hires                       # convert wavelength in microns to frequency in Hz
         pnu = np.append(pnu,pnu[-1]*pnu[-1]/pnu[-2]) # add on an extra one at the end for interpolation
@@ -247,9 +314,9 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             # Later we need the latitude of the planet pointed
             # toward the observer. To do this, we start with unit vectors
             # in the z direction, and rotate it using the same conventions
-            # as cartesian.pro. Note we assume zero obliquity.
-            # NOTE: THIS SECTION IS USED ONLY FOR LAT-LON RESOLVED ALBEDOS.
-            # IT MAY ALSO BE MISSING AN ARGPERI ROTATION.
+            # as cartesian.pro. Note we assume zero obliquity
+            # and zero eccentricity (i.e. eccentric anomaly = mean anomaly)
+            # NOTE: THIS SECTION IS USED ONLY FOR LAT-LON RESOLVED ALBEDOS
             x_uv0 = 0.       # a unit vector in the z direction
             y_uv0 = 0.
             z_uv0 = 1.
@@ -458,7 +525,10 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
                     
                     # Evaluate the phase function at all times
                     phasefunc = lambertian(beta)
-
+                    if settings.randphase:
+                        phaseparam = rng.random()
+                        phasefunc *= (1.-phaseparam)*fphaselo(beta) + phaseparam*fphasehi(beta)
+                        
                     # interpolate data0 to the hires array
                     # extrapolate because it was giving errors precisely at the endpoints.
                     f = interp1d(plambda0,data0,kind='cubic',bounds_error=False,fill_value='extrapolate')
@@ -610,7 +680,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
 
         hdr0['DATE'] = str(datetime.now())
         hdr0.comments['DATE'] = 'Date and time created'
-        hdr0['VERSION'] = 2.2
+        hdr0['VERSION'] = 2.3
         hdr0.comments['VERSION'] = 'Version of code used; used for post-processing scripts.'
         hdr0['N_EXT'] = 3+tempnp
         hdr0.comments['N_EXT'] = 'Last extension' # need to add this to the main header to enable extensions
@@ -642,6 +712,12 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         hdr2.comments['NCOMP'] = 'Number of disk components'
         hdr2['PXSCLMAS'] = settings.pixscale_mas
         hdr2.comments['PXSCLMAS'] = 'Pixel scale (mas)'
+        hdr2['IWA'] = settings.iwa
+        hdr2.comments['IWA'] = 'Inner working angle (arcsec)'
+        hdr2['DUSTBLOW'] = settings.rdust_blowout
+        hdr2.comments['DUSTBLOW'] = 'Dust blowout radius (microns)'
+        hdr2['TSUB'] = settings.tsublimate
+        hdr2.comments['TSUB'] = 'Dust sublimation temp (K)'
 
         for icomp in range(0,ncomponents):
             d = disks[i,icomp]
@@ -672,7 +748,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         # HDU 3: STAR PROPERTIES
         hdr3 = fits.Header()
         ic = 0
-        for ih in ['PA','I','ID','HIP','TYC2','dist','M_V','Vmag','Bmag','Umag','Rmag','Imag','Jmag','Hmag','Kmag','Type','Lstar','logg','Teff','angdiam','mass','rstar']:
+        for ih in starbase.keys():
             if ih not in s.index: hdr3[ih] = 'Invalid tag'
             elif pd.isnull(s[ih]): hdr3[ih] = 'NaN'
             else: hdr3[ih] = s[ih]
@@ -940,7 +1016,7 @@ def rgen(numx, numy=0):
 
 
 ######### WARNING: THIS ROUTINE IS LIKELY TO BE REWRITTEN #########
-def get_stellar_flux(s, lam, path='./'):
+def get_stellar_flux(s, lam, path='./', spectrum = None):
     # INPUTS
     # s: star structure
     # lam: desired wavelengths (microns)
@@ -959,14 +1035,25 @@ def get_stellar_flux(s, lam, path='./'):
     
     # Load the appropriate Kurucz stellar atmosphere model
     # klambda in units of nm
-    # kBnu is in units of erg s^-1 cm^-2 Hz^-1 steradian^-1
+    # kBnu is in units of erg s^-1 cm^-2 Hz^-1 sr^-1
 
-    klambda, kBnu = getkurucz(Tstar, logg, metallicity)
+    if spectrum != None:
+        starspec = open(spectrum,'r')
+        lines = starspec.readlines()
+        llen = len(lines)
+        klambda = np.zeros(llen)
+        kBnu = np.zeros(llen)
+        for i in range(0,len(lines)):
+            klambda[i] = float(lines[i].split()[0])
+            kBnu[i] = float(lines[i].split()[1])
+    else:
+        klambda, kBnu = getkurucz(Tstar, logg, metallicity)
+        
     klambda *= 0.001              # convert to microns
     
     # Interpolate to high spectral resolution
     specres = 10000            # internal spectral resolution
-
+    
     # The transition (bin edge) wavelengths have to be recalculated here
     # to account for the different wavelength points in the Kurucz spectra.
     dlnlambda = 1./specres
@@ -1143,8 +1230,6 @@ def getkurucz(teff, logg, metallicity=0.0):
 
     return lam,Bnu
 
-
-# ----- PENDING GETTING THE FORMATTING SORTED OUT -----
 def read_albedo_file(filename):
     '''
     Reads an ASCII file that contains the

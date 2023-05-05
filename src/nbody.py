@@ -120,5 +120,7 @@ def detect_transits(R, istar, state):
         
         if sep[i_pl-1]==1 and zpl>0: translist[i_pl-1] = 1
         elif sep[i_pl-1]==1 and zpl<0: translist[i_pl-1] = -1
+
+    mintrans = np.min(ttrans)
         
-    return np.min(ttrans), translist
+    return mintrans, translist

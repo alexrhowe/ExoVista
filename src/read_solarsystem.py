@@ -7,7 +7,7 @@ from src import Settings
 settings = Settings.Settings()
 
 def read_solarsystem(settings,system_file='example_system.dat'):
-
+    
     settings = settings
     fin = open(system_file,'r')
     
@@ -64,7 +64,7 @@ def read_solarsystem(settings,system_file='example_system.dat'):
     albedo_files = [albedo_files]
     dlist = fin.readline().split()
     
-    # Call generate_disks to get the disk structure added
+    # Call generate_disks to add the disk structure
     disk,composition = generate_disks.generate_disks(s,planet,settings)
     # reset all disk params to zero
     disk = np.zeros(disk.shape)[0]
@@ -72,8 +72,8 @@ def read_solarsystem(settings,system_file='example_system.dat'):
     while i < len(disk):
         try: l = fin.readline()
         except: break
-        if len(l)==0: break
-
+        if len(l)==0 or l.split()[0] == 'Settings': break
+        
         l = l.split()
         for tag in dlist:
             if tag=='composition': composition = [l[dlist.index(tag)]]
@@ -95,4 +95,19 @@ def read_solarsystem(settings,system_file='example_system.dat'):
         
     disk = np.array([disk])
     
-    return s,planet,albedo_files,disk,composition
+    # Read in imaging settings
+    
+    while True:
+        try: l = fin.readline()
+        except: break
+        if len(l)==0: break
+        
+        l = l.split()
+        if len(l)<2: continue
+        
+        tag = l[0]
+        val = l[1]
+        if tag == 'npix': setattr(settings, tag, int(val))
+        elif tag in vars(settings): setattr(settings, tag, float(val))
+        
+    return s,planet,albedo_files,disk,composition,settings
