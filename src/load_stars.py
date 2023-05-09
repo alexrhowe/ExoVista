@@ -26,6 +26,8 @@ def load_target_list(target_list_file):
     for i in range(0,hlen):
         header[i] = header[i].split('(')[0]
         header[i] = header[i].split(',')[0]
+        if header[i] == 'DEC': header[i] = 'Dec'
+        if header[i] == 'pmDEC': header[i] = 'pmDec'
     
     for i in range(0,dlen):
         grid.append([])
@@ -143,6 +145,9 @@ def load_stars(target_list_file):
  
     # Dust map can't handle logg > 5.25
     target_list = target_list[target_list['logg'] <= 5.24]
+
+    # Stellar model can't handle Teff < 3500
+    target_list = target_list[target_list['Teff'] >= 3500]
 
     # Fix indices of target list.
     target_list.index = range(len(target_list.index))

@@ -8,7 +8,7 @@ from src import generate_scene
 from src import read_solarsystem
 from src import Settings
 
-# ExoVista v2.3
+# ExoVista v2.31
 
 # Generates a universe of simulated planetary systems based on a stellar target list.
 
@@ -24,12 +24,13 @@ if __name__ == '__main__':
     settings = Settings.Settings(timemax=5.0, output_dir='output') # "standard" configuration
     
     #target_list_file = 'master_target_list-usingDR2-50_pc.txt'
-    target_list_file = 'target_list10.txt'
+    target_list_file = 'target_list8.txt'
     stars, nexozodis = load_stars.load_stars(target_list_file)
-    print('\n{0:d} stars in range.'.format(len(stars)))
+    print('\n{0:d} stars in model ranges.'.format(len(stars)))
     
     planets, albedos = generate_planets.generate_planets(stars, settings, addearth=True, usebins=True)
     disks, compositions = generate_disks.generate_disks(stars, planets, settings, nexozodis=nexozodis)
+    print('Generating scenes. (This may take a while.)')
     
     if parallel:
         cores = min(maxcores,os.cpu_count())

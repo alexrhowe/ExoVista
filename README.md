@@ -1,6 +1,6 @@
-# ExoVista v2.2
+# ExoVista v2.31
 
-March 23, 2023
+May 9, 2023
 
 Alex Howe & Chris Stark
 

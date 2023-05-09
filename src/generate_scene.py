@@ -17,7 +17,7 @@ from src import Settings
 
 settings = Settings.Settings()
 
-def load_lqsca(lqq_dir, composition, rdust, rdust_boundaries, lam):
+def load_lqsca(lqq_dir, composition, rdust, rdust_boundaries, lam):    
     '''
     lqq_dir: directory (including /) of lqq files
     composition: composition of dust (string)
@@ -128,11 +128,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
     rng = np.random.default_rng(settings.seed)
     
     pixscale_arcsec = settings.pixscale
-    if settings.output_dir == 'output': print('Default output directory: ./output/')
     if settings.output_dir[-1] != '/': settings.output_dir = settings.output_dir + '/'
     if not path.isdir(settings.output_dir): mkdir(settings.output_dir)
-
-    print('Generating scenes. (This may take a while.)')
 
     # Define time array
     timemin = 0.
@@ -195,8 +192,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         cosinc = np.cos(s['I'] * np.pi/180.)
         sininc = np.sin(s['I'] * np.pi/180.)
         
-        print('i = {0:d}'.format(i))
-        print('starID = {0:d}'.format(s['ID']))
+        print('i = {0:d}:\t starID = {1:d}'.format(i,s['ID']))
         
         hiptag = ''
         if s['HIP'] > 0: hiptag = s['HIP']
@@ -213,7 +209,6 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         
         # ----- START OF DISK IMAGING ----
         # Now we image the disk
-        print('Creating disk image...')
         disk_contrast_image = np.zeros((settings.npix,settings.npix,nlambda_disk))
         
         # Determine range of grain sizes for this star
@@ -244,7 +239,6 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         
         # ----- START OF PLANET CALCULATIONS -----
         # Now the planets
-        print('Planet flux/integration...')
         p = planets[i]
         j = np.where(p[:,pllabel.index('R')] > 0)
         tempnplanets = len(j[0])+1  # add 1 to include the star
@@ -367,7 +361,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             for ip in range(0,tempnplanets-1): translistfull.append([])
                         
             for it in range(0,ntimes):
-                if it%16==0: print(it,ntimes)
+                if it%16==0: print('Star {0:d}, integration step {1:d}/{2:d}'.format(s['ID'],it,ntimes))
                 # Integrate forward in time
                 desired_time = it * settings.dt # dt is in years
                 cart_end,tlist,transmaster = nbody.nbody(cart0,GMvector,Rvector,s['I'],curr_time,desired_time)
@@ -666,7 +660,6 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             
         # ----- END OF FLUX CALCULATION -----
                 
-        print('generate_scene() done for Star {0:d}.'.format(s['ID']))
         # ----- END OF PLANET FLUX/INTEGRATION -----
         
         
@@ -680,7 +673,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
 
         hdr0['DATE'] = str(datetime.now())
         hdr0.comments['DATE'] = 'Date and time created'
-        hdr0['VERSION'] = 2.3
+        hdr0['VERSION'] = 2.31
         hdr0.comments['VERSION'] = 'Version of code used; used for post-processing scripts.'
         hdr0['N_EXT'] = 3+tempnp
         hdr0.comments['N_EXT'] = 'Last extension' # need to add this to the main header to enable extensions
@@ -738,28 +731,28 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         # arrays must be transposed for backward compatibility with IDL outputs
         hdu2 = fits.ImageHDU(disk_contrast_image.T, header=hdr2)
 
-        # HDU T: LIST OF TRANSITS AND ECLIPSES
-        hdrt = fits.Header()
-        hdrt['BASELINE'] = settings.timemax*365.25
-        hdrt.comments['BASELINE'] = 'Length of baseline (days)'
-        
-        hdut = fits.ImageHDU(transits, header=hdrt)
-        
-        # HDU 3: STAR PROPERTIES
+        # HDU 3: LIST OF TRANSITS AND ECLIPSES
         hdr3 = fits.Header()
+        hdr3['BASELINE'] = settings.timemax*365.25
+        hdr3.comments['BASELINE'] = 'Length of baseline (days)'
+        
+        hdu3 = fits.ImageHDU(transits, header=hdr3)
+        
+        # HDU 4: STAR PROPERTIES
+        hdr4 = fits.Header()
         ic = 0
         for ih in starbase.keys():
-            if ih not in s.index: hdr3[ih] = 'Invalid tag'
-            elif pd.isnull(s[ih]): hdr3[ih] = 'NaN'
-            else: hdr3[ih] = s[ih]
-            if ih in scomments: hdr3.comments[ih] = scomments[ih]
-        hdr3['PXSCLMAS'] = settings.pixscale_mas
-        hdr3.comments['PXSCLMAS'] = 'Pixel scale (mas)'
-        hdr3['COMMENT'] = 'Star data array'
+            if ih not in s.index: hdr4[ih] = 'Invalid tag'
+            elif pd.isnull(s[ih]): hdr4[ih] = 'NaN'
+            else: hdr4[ih] = s[ih]
+            if ih in scomments: hdr4.comments[ih] = scomments[ih]
+        hdr4['PXSCLMAS'] = settings.pixscale_mas
+        hdr4.comments['PXSCLMAS'] = 'Pixel scale (mas)'
+        hdr4['COMMENT'] = 'Star data array'
         
-        hdu3 = fits.ImageHDU(planet_data[0].T, header=hdr3)
+        hdu4 = fits.ImageHDU(planet_data[0].T, header=hdr4)
         
-        hdul = fits.HDUList([hdu0, hdu1, hdu2, hdut, hdu3])
+        hdul = fits.HDUList([hdu0, hdu1, hdu2, hdu3, hdu4])
 
         # HDRN: PLANET PROPERTIES
         for ip in range(1,len(planet_data)):
@@ -780,8 +773,8 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
             hdul.append(hdun)
             
         hdul.writeto(fits_filename)
-
-    print('generate_scene done.')
+        
+        print('generate_scene() done for Star {0:d}.'.format(s['ID']))
     return
 
 
@@ -989,7 +982,7 @@ def distribute_diskpoints(s, disk, rdust, drdust, Qsca, xcen=0, ycen=0, xwidth=s
                 for jy in range(0,nsubarraypix):
                     masterimg[ix+jx-xstart,iy+jy-ystart,0:nlambda] = img
                     masterimg[ix+jx-xstart,iy+jy-ystart,-1] = precision[ix+jx-xstart,iy+jy-ystart]
-        if ix%16==0: print(ix,maxnxy_used,maxnz_used,tol0)
+        if ix%16==0: print('Star {0:d}, disk image line {1:d}/{2:d}.\t xy-grid: {3:d}, z-grid: {4:d}, tolerance: {5:f}'.format(s['ID'],ix,xend,maxnxy_used,maxnz_used,tol0))
         
     return masterimg
 
@@ -1023,7 +1016,6 @@ def get_stellar_flux(s, lam, path='./', spectrum = None):
     
     # OUTPUTS
     # fstar: stellar flux in Jy
-    print('Computing stellar spectrum...')
     
     Tstar = s['Teff']
     logg = s['logg']
@@ -1035,7 +1027,7 @@ def get_stellar_flux(s, lam, path='./', spectrum = None):
     
     # Load the appropriate Kurucz stellar atmosphere model
     # klambda in units of nm
-    # kBnu is in units of erg s^-1 cm^-2 Hz^-1 sr^-1
+    # kBnu is in units of erg s^-1 cm^-2 Hz^-1 steradian^-1
 
     if spectrum != None:
         starspec = open(spectrum,'r')
@@ -1230,6 +1222,8 @@ def getkurucz(teff, logg, metallicity=0.0):
 
     return lam,Bnu
 
+
+# ----- PENDING GETTING THE FORMATTING SORTED OUT -----
 def read_albedo_file(filename):
     '''
     Reads an ASCII file that contains the

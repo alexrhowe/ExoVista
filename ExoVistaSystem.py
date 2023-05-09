@@ -6,7 +6,7 @@ from src import read_solarsystem
 from src import generate_scene
 from src import Settings
 
-# ExoVista v2.3
+# ExoVista v2.31
 
 # Generates a single, user-defined planetary system.
 
@@ -69,6 +69,7 @@ while not path.exists(filename):
             ndisk -= 1
             break
 
-settings = Settings.Settings(output_dir='./', ncomponents=ndisk, timemax=10.) # "standard" configuration
+settings = Settings.Settings(output_dir='./output', ncomponents=ndisk, timemax=10.) # "standard" configuration
 s,p,a,d,c,new_settings = read_solarsystem.read_solarsystem(settings,system_file=filename)
+print('Generating scene...')
 generate_scene.generate_scene(s,p,d,a,c,new_settings)

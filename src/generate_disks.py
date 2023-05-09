@@ -196,5 +196,5 @@ def generate_disks(stars, planets, settings, nexozodis=None, rand_components=Fal
             tcoll = torbit / (4*np.pi*disks[i,j,dlabel.index('nzodis')]*1e-7) # yr            
             disks[i,j,dlabel.index('eta')] = tpr / tcoll
     
-    print('generate_disks() done')
+    print('generate_disks() done\n')
     return disks, compositions

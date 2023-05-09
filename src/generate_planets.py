@@ -61,7 +61,7 @@ def radius_to_mass(R):
     
 
 def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, usebins=False, subdivide=1):
-    
+    print('Generating planets...')
     settings = settings
     rng = np.random.default_rng(seed=settings.seed)
     
@@ -194,7 +194,7 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
     
     while nplanets < nexpected and n_nochange < 50 and jj < 200:
         print('Iteration number: ',jj)
-        print('{0:d} planets expected.'.format(nexpected))
+        #print('{0:d} planets expected.'.format(nexpected))
         prev_nplanets = nplanets
      
         # First, add some random planets based on occurrence rates
@@ -202,7 +202,7 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
 
         # Number of stars with new planets
         nnew = len(np.where(hillsphere_flag)[0])
-        print('{0:d} systems changed.'.format(nnew)) 
+        #print('{0:d} systems changed.'.format(nnew)) 
         
         # Now remove any unstable ones
         plorb = remove_unstable_planets(stars, plorb, hillsphere_flag)
@@ -211,13 +211,13 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
         nplanets = 0
         for i in range(0,nstars):
             nplanets += len(np.where(plorb[i,:,pllabel.index('R')] > 0)[0])
-        print('{0:d} stable planets.'.format(nplanets))
+        #print('{0:d} stable planets.'.format(nplanets))
         
         dnp = nplanets-prev_nplanets
         if dnp<=0: n_nochange += 1   # Ends loop if no increase for 50 iterations.
         else: n_nochange = 0         # (No change gets stuck for small target lists.)
         jj += 1
-        print('No increase for {0:d} iterations.\n'.format(n_nochange))
+        #print('No increase for {0:d} iterations.\n'.format(n_nochange))
         
     # Erase semi-major axis of non-existant planets
     for i in range(0,nstars):
@@ -234,7 +234,7 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
     print('{0:d} planets generated after imposing stability limits.'.format(nplanets))
     
     # Randomly assign all planets an albedo file
-    print('Assigning planet types/albedos based on rules in assign_albedo_file()')
+    print('Assigning planet types/albedos based albedo_list.csv...')
     albedos = assign_albedo_file(stars, plorb, rng)
 
     # if True, adds a zero-mass Earth twin at quadrature for yield calculations
@@ -378,8 +378,6 @@ def load_occurrence_ratesMA(filename, subdivide=1, usebins=False):
     dlna_out = np.log(asize) / dlna_in
 
     newoccrate *= np.outer(np.log(asize), np.log(msize))
-
-    print(np.max(newoccrate))
     
     if np.max(newoccrate) > 1:
         print('Error: max occurrence rate > 1. Try increasing the grid size.')
@@ -438,10 +436,6 @@ def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, r
 
     lora_array = np.log(ora_array)
     lorM_array = np.log(orM_array)
-
-    print(nplanets_histo.shape)
-    print(len(ora_array))
-    print(len(orM_array))
     
     # Generate random orbital parameters and sizes (some may be unstable)
     iref = 0
@@ -465,7 +459,7 @@ def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, r
                 iref += ntemp
     
     # Calculate radius in Earth radii based on Chen & Kipping (2017)
-    temp_planets[:,pllabel.index('R')] = mass_to_radius(temp_planets[:,pllabel.index('M')], randrad, rng)
+    temp_planets[:,pllabel.index('R')] = mass_to_radius(temp_planets[:,pllabel.index('M')], rng, randrad)
     
     # Randomly assign to stars and sort by semi-major axis
     starindices = np.vectorize(int)(rng.random(nplanets) * nstars)
@@ -493,7 +487,7 @@ def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, r
                 plorb[i] = temp_planets2[0:maxnplanets]
             hillsphere_flag[i] = True # any star w/ a planet added needs recalculation of hill spheres
             
-    print('{0:d} planets created.'.format(isum))
+    #print('{0:d} planets created.'.format(isum))
     
     return plorb, hillsphere_flag
 
