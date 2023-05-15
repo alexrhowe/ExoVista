@@ -8,7 +8,7 @@ from src import generate_scene
 from src import read_solarsystem
 from src import Settings
 
-# ExoVista v2.31
+# ExoVista v2.32
 
 # Generates a universe of simulated planetary systems based on a stellar target list.
 

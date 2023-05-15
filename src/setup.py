@@ -6,9 +6,9 @@ from Cython.Distutils import build_ext
 # Build command:
 # python setup.py build_ext --inplace
 
-import os
-os.environ['CC'] = 'gcc'
-os.environ['CXX'] = 'g++'
+#import os
+#os.environ['CC'] = 'gcc'
+#os.environ['CXX'] = 'g++'
 
 ext_modules1=[Extension("wrapImage",sources=["wrapImage.pyx"],language="c++")]
 ext_modules2=[Extension("wrapIntegrator",sources=["wrapIntegrator.pyx"],language="c++")]
