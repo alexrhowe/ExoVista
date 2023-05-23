@@ -43,8 +43,6 @@ def load_scene(inputfile, time = 0):
     else:
         specstart = 16
         hstar = 4
-        
-    specstart = 16 # temp for the current batch of files
     
     nplanets = len(hdul)-hstar
     if(abs(hdul[-1].header['A']/np.sqrt(hdul[hstar].header['LSTAR'])-1)<1.e-5): nplanets -= 1 # remove the extra Earth twin if it is present

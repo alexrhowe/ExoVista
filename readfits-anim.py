@@ -82,8 +82,6 @@ if version <= 2.1:
 else:
     specstart = 16
     hstar = 4
-
-specstart = 16 # temp for the current batch of files
     
 speclen = len(hdul[0].data)
 
