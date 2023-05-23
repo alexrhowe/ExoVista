@@ -167,7 +167,9 @@ def animate(j):
     for i in range(1,nplanets):
         x = planetdata[i-1,j,1]
         y = planetdata[i-1,j,2]
-        if (x-125)**2 + (y-125)**2 <= (loD*1.5)**2: continue
+        if (x-125)**2 + (y-125)**2 <= (loD*1.5)**2:
+            dots[i].set_color('k')
+            continue
         bright = plbright[i-1,j]
         dots[i].set_data([x],[y])
     

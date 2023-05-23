@@ -205,7 +205,9 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         else:
             fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])
         
-        if path.exists(fits_filename): continue # if the output file already exists, we skip this star
+        if path.exists(fits_filename):
+            print('A FITS file already exists for starID {0:d}'.format(s['ID']))
+            continue # if the output file already exists, we skip this star
         
         # ----- START OF DISK IMAGING ----
         # Now we image the disk
@@ -673,7 +675,7 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
 
         hdr0['DATE'] = str(datetime.now())
         hdr0.comments['DATE'] = 'Date and time created'
-        hdr0['VERSION'] = 2.31
+        hdr0['VERSION'] = 2.33
         hdr0.comments['VERSION'] = 'Version of code used; used for post-processing scripts.'
         hdr0['N_EXT'] = 3+tempnp
         hdr0.comments['N_EXT'] = 'Last extension' # need to add this to the main header to enable extensions

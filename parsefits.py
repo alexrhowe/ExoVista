@@ -72,8 +72,7 @@ nplanets = len(hdul)-hstar
 if(abs(hdul[-1].header['A']/np.sqrt(hdul[hstar].header['LSTAR'])-1)<1.e-5): nplanets -= 1 # remove the extra Earth twin if it is present
 
 hip = hdul[hstar].header['HIP']
-
-fout = open('hip{0:d}.input.dat'.format(hip),'w')
+fout = open('HIP_{0:d}.input.dat'.format(hip),'w')
 
 fout.write('Star\n')
 fout.write('ID\t{0:s}\n'.format('999' + str(hdul[hstar].header['ID'])))
@@ -123,11 +122,11 @@ for i in range(0,hdul[2].header['NCOMP']):
     
 fout.write('Settings\n')
 fout.write('pixscale\t{0:f}\n'.format(hdul[2].header['PXSCLMAS']*0.001))
-if version >= 2.3: fout.write('iwa\t{0:f}\n'.format(hdul[2].header['IWA']))
-fout.write('npix\t{0:d}\n'.format(hdul[0].header['NAXIS1']))
-fout.write('specres\t{0:f}\n'.format(hdul[0].header['SPECRES']))
+if version >= 2.3: fout.write('iwa\t\t{0:f}\n'.format(hdul[2].header['IWA']))
+fout.write('npix\t\t{0:d}\n'.format(hdul[2].header['NAXIS1']))
+fout.write('specres\t\t{0:f}\n'.format(hdul[0].header['SPECRES']))
 fout.write('specresdisk\t{0:f}\n'.format(hdul[1].header['SPECRES']))
-fout.write('lammin\t{0:f}\n'.format(hdul[0].header['LAMMIN']))
-fout.write('lammax\t{0:f}\n'.format(hdul[0].header['LAMMAX']))
-if version >= 2.3: fout.write('rdust_blowout\t{0:f}\n'.format(hdul[2].header['PXSCLMAS']*0.001))
-if version >= 2.3: fout.write('tsublimate\t{0:f}\n'.format(hdul[2].header['PXSCLMAS']*0.001))
+fout.write('lammin\t\t{0:f}\n'.format(hdul[0].header['LAMMIN']))
+fout.write('lammax\t\t{0:f}\n'.format(hdul[0].header['LAMMAX']))
+if version >= 2.3: fout.write('rdust_blowout\t{0:f}\n'.format(hdul[2].header['DUSTBLOW']))
+if version >= 2.3: fout.write('tsublimate\t{0:f}\n'.format(hdul[2].header['TSUB']))

@@ -6,6 +6,9 @@ from astropy.utils.data import get_pkg_data_filename
 import os
 import sys
 import time
+from matplotlib import animation
+from matplotlib.backends.backend_pdf import PdfPages
+import ffmpeg
 
 filename = '999-HIP_-TYC_SUN-mv_4.83-L_1.00-d_10.00-Teff_5778.00.fits'
 
@@ -21,8 +24,8 @@ lambda_ref    = 0.50  # reference wavelength in microns
 mirror_size   = 8.0   # mirror diameter in meters
 disk_gain     = 1.0   # multiplies the brightness of the disk image
 log_disk      = False # color the disk brightness on a logarithmic scale
-planet_bright = False # scale planet brightnesses relative to the maxima of their phase curves
-color_code    = False # color-code the planets based on type
+planet_bright = True  # scale planet brightnesses relative to the maxima of their phase curves
+color_code    = True  # color-code the planets based on type
 fitsdir = './output'  # directory of FITS files
 
 filename = ''
@@ -97,7 +100,7 @@ planetdata = np.zeros((nplanets,ntimes,npoints))
 stardata = hdul[hstar].data
 for i in range(1,nplanets): planetdata[i-1] = hdul[i+hstar].data # note here and later that counting starts from 1 because it's counted from hstar
 
-# Plot 1: Image of disk and planets marked by brightness relative to full phase
+# Plot image of disk and planets marked by brightness relative to full phase
 
 ild = np.where(hdul[1].data >= lambda_ref)[0][0]-1
 print('Disk brightness plotted at {0:5.1f} nm'.format(hdul[1].data[ild]*1000))
@@ -134,13 +137,6 @@ for i in range(1,nplanets):
     coords[i-1,0,:] = planetdata[i-1,:,1]
     coords[i-1,1,:] = planetdata[i-1,:,2]
 
-line, = ax.plot([], [])
-dots = []
-
-for i in range(0,nplanets):
-    lobj = ax.plot([],[],'o',markersize=10,c='w')[0]
-    dots.append(lobj)
-
 ilam = np.where(hdul[0].data >= lambda_ref)[0][0]-1
 print('Planet brightness plotted at {0:5.1f} nm'.format(hdul[0].data[ilam]*1000))
 starbright = np.log10(stardata[0,ilam])
@@ -153,110 +149,31 @@ for i in range(1,nplanets):
     plbright[i-1] /= np.max(plbright[i-1])  # normalize each planet's brightness to the maximum over its orbit
     albedos.append(hdul[i+hstar].header['ALBEDO_F'])
 
-for i in range(1,nplanets):
-    x = planetdata[i-1,0,1]
-    y = planetdata[i-1,0,2]
-    if (x-125)**2 + (y-125)**2 <= (loD*1.5)**2: continue
-    bright = plbright[i-1,0]
-    dots[i].set_data([x],[y])
+dots = []
+for i in range(0,nplanets):
+    lobj = ax.plot([],[],'o',markersize=10,c='w')[0]
+    dots.append(lobj)
+fig.canvas.draw()
+plt.show(block=False)
+
+for j in range(0,ntimes):
+    for i in range(1,nplanets):
+        x = planetdata[i-1,j,1]
+        y = planetdata[i-1,j,2]
+        if (x-125)**2 + (y-125)**2 <= (loD*1.5)**2:
+            dots[i].set_color('k')
+            continue
+        bright = plbright[i-1,j]
+        dots[i].set_data([x],[y])
     
-    # Set planet colors
-    if not planet_bright: bright = 1.0 # Sets all planets to maximum brightness
-    newcolor = (bright,bright,bright) # Sets all planets to greyscale based on their brightness
+        # Set planet colors
+        if not planet_bright: bright = 1.0 # Sets all planets to maximum brightness
+        newcolor = (bright,bright,bright) # Sets all planets to greyscale based on their brightness
+        
+        # Color-codes planets based on type.
+        if color_code and albedos[i-1] in planetcolors:
+            newcolor = tuple([bright*x for x in planetcolors[albedos[i-1]]])
     
-    # Color-codes planets based on type.
-    if color_code and albedos[i-1] in planetcolors:
-        newcolor = tuple([bright*x for x in planetcolors[albedos[i-1]]])
-    
-    dots[i].set_color(newcolor)
-plt.style.use('default')
-
-# Plot 2: Disk brightness profile along the x-axis
-# Recommend to use with PA=0.
-
-fig2 = plt.figure()
-ax2 = fig2.add_subplot(111)
-dist = hdul[hstar].header['DIST']
-print(dist,pixscale)
-x = (np.arange(250)-124.5)*pixscale*dist*0.001
-y = np.zeros(250)
-for i in range(0,250): y[i] = disk[i,125]
-ax2.tick_params(which='both',direction='in',top=True,right=True)
-plt.title('Disk brightness profile along the x-axis')
-ax2.set_xlabel('x (AU)')
-ax2.set_ylabel('Disk Surface Brightness (contrast/pix)')
-ax2.plot(x,y)
-ax2.set_yscale('log')
-
-# Plot 3: Planetary contrast spectra at t=0
-
-wave = hdul[0].data
-fig3 = plt.figure()
-ax3 = fig3.add_subplot(111)
-ax3.tick_params(direction='in',top=True,right=True)
-plt.title('Contrast Spectra at $t=0$')
-ax3.set_xlabel('Wavelength (${\\rm \\mu m}$)')
-ax3.set_ylabel('Planet-Star Contrast')
-for i in range(1,nplanets):
-    spec = planetdata[i-1,0,specstart:]
-    ax3.plot(wave,spec,label='Planet {0:d}'.format(i))
-ax3.set_ylim((0,None))
-plt.legend()
-
-# Plot 4: Contrast phase curves of the planets at the reference wavelength
-
-ptime = stardata[:,ilam+15]
-time = np.arange(len(ptime))*10
-
-fig4 = plt.figure()
-ax4 = fig4.add_subplot(111)
-ax4.tick_params(direction='in',top=True,right=True)
-plt.title('Contrast Phase Curves')
-ax4.set_xlabel('Time (days)')
-ax4.set_ylabel('Planet-Star Contrast')
-for i in range(1,nplanets):
-    ptime = planetdata[i-1,:,ilam+specstart]
-    ax4.plot(time,ptime,label='Planet {0:d}'.format(i))
-ax4.set_ylim((0,None))
-plt.legend()
-
-# Plot 5: 2-D trajectories of the planets on the plane of the sky
-
-fig5 = plt.figure()
-ax5 = fig5.add_subplot(111)
-ax5.tick_params(direction='in',top=True,right=True)
-plt.title('On-Sky Planet Trajectories (pixels)')
-for i in range(1,nplanets):
-    xtime = planetdata[i-1,:,1]
-    ytime = planetdata[i-1,:,2]
-    ax5.plot(xtime,ytime,label='Planet {0:d}'.format(i))
-    ax5.plot(125,125,'o',c='k',markersize=10)
-
-# Printing a list of transit and eclipse events
-    
-if version >= 2.2:
-    transits = hdul[3].data
-    if len(transits[0])==1 and transits[0,0] == 0.:
-        print('No transits or eclipses.')
-    else:
-        print('Transit and Eclipse Event List')
-        for i in range(0,len(transits[0])):
-            event = ''
-            if transits[2,i]+transits[3,i]>0: event='transit'
-            if transits[2,i]+transits[3,i]<0: event='eclipse'
-            if transits[2,i]==0:
-                print('Planet {0:d} {1:s} ingress at {2:.2f} days'.format(int(transits[1,i]),event,transits[0,i]))
-            elif transits[3,i]==0:
-                print('Planet {0:d} {1:s}  egress at {2:.2f} days'.format(int(transits[1,i]),event,transits[0,i]))
-            elif transits[2,i]==transits[3,i]:
-                print('Planet {0:d} {1:s} in progress at {2:.2f} days'.format(int(transits[1,i]),event,transits[0,i]))
-            else: print('Error in event format at {2:.2f} days'.format(transits[0,i]))
-
-'''
-fig.savefig('disk_image.png')
-fig2.savefig('disk_profile.png')
-fig3.savefig('planet_spectra.png')
-fig4.savefig('phase_curves.png')
-fig5.savefig('planet_motions.png')
-'''
-plt.show()
+        dots[i].set_color(newcolor)
+    fig.canvas.draw()
+    plt.pause(0.016667)
