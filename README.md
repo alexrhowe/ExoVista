@@ -1,5 +1,5 @@
-# ExoVista v2.32
-May 15, 2023
+# ExoVista v2.33
+May 23, 2023
 Alex Howe & Chris Stark
 NASA Goddard Space Flight Center
 
