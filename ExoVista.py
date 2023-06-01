@@ -21,7 +21,7 @@ except:
 
 if __name__ == '__main__':
 
-    settings = Settings.Settings(timemax=5.0, output_dir='output') # "standard" configuration
+    settings = Settings.Settings(timemax=10.0, output_dir='output') # "standard" configuration
     
     #target_list_file = 'master_target_list-usingDR2-50_pc.txt'
     target_list_file = 'target_list8.txt'
