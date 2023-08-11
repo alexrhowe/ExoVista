@@ -6,7 +6,7 @@ from src import read_solarsystem
 from src import generate_scene
 from src import Settings
 
-# ExoVista v2.33
+# ExoVista v2.4
 
 # Generates a single, user-defined planetary system.
 

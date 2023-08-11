@@ -26,21 +26,25 @@ for i in range(0,len(alines)):
 if atype=='Flux': abound = 1./np.sqrt(abound)
 
 
-def mass_to_radius(M, rng, randrad=False):
+def mass_to_radius(M, rng, a=None, randrad=False):
     # Calculates radius in Earth radii based on Chen & Kipping (2017)
-    R = 1.008 * M**0.279
+    if a is None: a = np.full(M.shape,1.)
     
-    j = np.where(M>2.04)[0]
+    R = 1.008 * M**0.279
     i = np.where(M<=2.04)[0]
     if randrad: R[i] *= rng.lognormal(sigma = np.log(1.0403), size = len(i))
-    R[j] = 1.008 * 2.04**0.279 * (M[j]/2.04)**0.589
     
-    j = np.where(M>131.6)[0]
+    j = np.where(M>2.04)[0]
+    R[j] = 1.008 * 2.04**0.279 * (M[j]/2.04)**0.589
     i = [k for k in range(0,len(M)) if M[k]>2.04 and M[k]<=131.6]
     if randrad: R[i] *= rng.lognormal(sigma = np.log(1.146), size = len(i))
+    
+    j = np.where(M>131.6)[0]
     R[j] = 1.008 * 2.04**0.279 * (131.6/2.04)**0.589 * (M[j]/131.6)**-0.044
-         
-    if randrad: R[j] *= rng.lognormal(sigma = np.log(1.0737), size = len(j))
+    if randrad:
+        R[j] *= rng.lognormal(sigma = np.log(1.0737), size = len(j))
+        i = [k for k in range(0,len(M)) if R[k]>14.31 and a[k]>0.091]
+        R[i] = 14.31
     
     return R
 
@@ -184,7 +188,7 @@ def generate_planets(stars, settings, bound='', nomcdraw=False, addearth=False, 
                 for ii in range(amin,amax):
                     for jj in range(mmin,mmax):
                         expected[ii,jj] = len(np.where(randgrid[ii,jj] < occrates[ii,jj])[0])
-                
+
     nexpected = int(np.sum(expected))
 
     hillsphere_flag = np.full(nstars, True) # improves run time efficiency: calculate new planets only if True.
@@ -459,7 +463,7 @@ def add_planets(stars, plorb, expected, orM_array, ora_array, hillsphere_flag, r
                 iref += ntemp
     
     # Calculate radius in Earth radii based on Chen & Kipping (2017)
-    temp_planets[:,pllabel.index('R')] = mass_to_radius(temp_planets[:,pllabel.index('M')], rng, randrad)
+    temp_planets[:,pllabel.index('R')] = mass_to_radius(temp_planets[:,pllabel.index('M')], rng, temp_planets[:,pllabel.index('a')], randrad)
     
     # Randomly assign to stars and sort by semi-major axis
     starindices = np.vectorize(int)(rng.random(nplanets) * nstars)

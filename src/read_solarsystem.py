@@ -27,14 +27,20 @@ def read_solarsystem(settings,system_file='example_system.dat'):
         
         tag = l.split()[0]
         val = l.split()[1]
+        tag = tag.replace('_','')
+        
+        for label in alias:
+            if tag.lower().startswith(label.lower()):
+                if label.lower=='ra' and tag.lower().startswith('rad'): continue
+                tag = alias[label]
+                if tag in strlist: s[tag] = val
+                elif tag in intlist: s[tag] = int(val)
+                else: s[tag] = float(val)
+                break
 
-        if tag in s.columns.values:
-            if tag in strlist: s[tag] = val
-            elif tag in intlist: s[tag] = int(val)
-            else: s[tag] = float(val)
-        elif tag=='BmV': BmV = float(val)
+        if tag=='I': s['I'] = float(val)
     
-    s['Vmag'] = s['M_V']-5 + 5*np.log10(s['dist']) # apparent V band mag
+    if s['Vmag'].loc[0]==0. and s['M_V'].loc[0]!=0.: s['Vmag'] = s['M_V']-5 + 5*np.log10(s['dist']) # apparent V band mag
     if s['Bmag'].loc[0]==0.: s['Bmag'] = s['Vmag'] + BmV  # apparent B band mag
     s['angdiam'] = 0.465*s['rstar'] / (s['dist']/10.)
     

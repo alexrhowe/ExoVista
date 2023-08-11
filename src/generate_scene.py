@@ -3,9 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.interpolate import interp2d
-from os import path
-from os import mkdir
-from os import system
+from os import path,mkdir,system,listdir,remove
 from astropy.io import fits
 from datetime import datetime
 import cython
@@ -200,14 +198,23 @@ def generate_scene(stars, planets, disks, albedos, compositions, settings):
         else: tempdir = './' + settings.output_dir # if output_dir is relative or absolute
         if settings.hires:
             fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-HIRES-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])            
-        elif 'TYC2' in stars.columns:
-            fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-TYC_' + str(s['TYC2']) + '-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])
+        elif 'TYC' in stars.columns:
+            fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-TYC_' + str(s['TYC']) + '-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])
         else:
             fits_filename = tempdir + str(s['ID']) + '-HIP_' + str(hiptag) + '-mv_{0:4.2f}-L_{1:4.2f}-d_{2:4.2f}-Teff_{3:4.2f}.fits'.format(s['Vmag'],s['Lstar'],s['dist'],s['Teff'])
         
-        if path.exists(fits_filename):
-            print('A FITS file already exists for starID {0:d}'.format(s['ID']))
-            continue # if the output file already exists, we skip this star
+        found = False
+        for file in listdir(tempdir):
+            if file.startswith('{0:d}-'.format(s['ID'])):
+                found = True
+                if settings.overwrite:
+                    remove(tempdir + file)
+                    print('A FITS file already exists for starID {0:d}. Overwriting.'.format(s['ID']))
+                else:
+                    print('A FITS file already exists for starID {0:d}. Skipping.'.format(s['ID']))
+                    break
+        if found and not settings.overwrite:     
+            continue
         
         # ----- START OF DISK IMAGING ----
         # Now we image the disk

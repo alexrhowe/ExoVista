@@ -40,7 +40,7 @@ class Settings():
     density_ratio: float = 5.      # all components have the same density w/in this factor
     stability_factor: float = 3.
     rinner_mass_threshold: float = 100.
-    dror_min:      float = 0.05     # dust belts must be at least this wide
+    dror_min:      float = 0.05    # dust belts must be at least this wide
     dror_max:      float = 0.3
     hor_min:       float = 0.03
     hor_max:       float = 0.2
@@ -51,6 +51,7 @@ class Settings():
     timemax:      float = 1.e-10
     dt:           float = 10./365.25
     output_dir:     str = 'output'
+    overwrite:     bool = False    # set to True to automatically overwrite existing FITS files
     
     def __post_init__(self):
         self.pixscale_mas = self.pixscale * 1000.

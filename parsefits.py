@@ -8,11 +8,28 @@ filename = ''
 fitsdir = './output'  # directory of FITS files
 
 if len(sys.argv)>1:
-    filename = sys.argv[1]
-    try: hdul = fits.open(filename)
-    except:
-        print('Error: file not found or in wrong format.')
-        filename = ''
+    i=1
+    for arg in sys.argv:
+        if sys.argv[i] == '-f' or sys.argv[i] == '-file':
+            try:
+                filename = sys.argv[i+1]
+                hdul = fits.open(filename)
+            except:
+                print('Error: file not found or in wrong format.')
+                filename = ''
+            if i+1==len(sys.argv): break
+            elif sys.argv[i+1][0] == '-': i+=1
+            else: i+=2
+        elif sys.argv[i] == '-o' or sys.argv[i] == '-output':
+            try:
+                fitsdir = sys.argv[i+1]
+            except:
+                print('Error: output directory not found or in wrong format.')
+            if i+1==len(sys.argv): break
+            elif sys.argv[i+1][0] == '-': i+=1
+            else: i+=2
+        else: pass
+        if i>=len(sys.argv): break
         
 if filename == '':
     print('Listing available files in FITS file directory...')

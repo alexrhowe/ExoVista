@@ -24,15 +24,55 @@ log_disk      = False # color the disk brightness on a logarithmic scale
 planet_bright = False # scale planet brightnesses relative to the maxima of their phase curves
 color_code    = False # color-code the planets based on type
 fitsdir = './output'  # directory of FITS files
-
 filename = ''
 
 if len(sys.argv)>1:
-    filename = sys.argv[1]
-    try: hdul = fits.open(filename)
-    except:
-        print('Error: file not found or in wrong format.')
-        filename = ''
+    i=1
+    for arg in sys.argv:
+        if sys.argv[i] == '-l' or sys.argv[i] == '-lambda':
+            try:
+                lambda_ref = float(sys.argv[i+1])
+                i+=2
+            except: i+=1
+        elif sys.argv[i] == '-m' or sys.argv[i] == '-mirror':
+            try:
+                mirror_size = float(sys.argv[i+1])
+                i+=2
+            except: i+=1
+        elif sys.argv[i] == '-g' or sys.argv[i] == '-gain':
+            try:
+                disk_gain = float(sys.argv[i+1])
+                i+=2
+            except: i+=1
+        elif sys.argv[i] == '-ld' or sys.argv[i] == '-logdisk':
+            log_disk = True
+            i+=1
+        elif sys.argv[i] == '-pb' or sys.argv[i] == '-planetbright':
+            planet_bright = True
+            i+=1
+        elif sys.argv[i] == '-c' or sys.argv[i] == '-color':
+            color_code = True
+            i+=1
+        elif sys.argv[i] == '-f' or sys.argv[i] == '-file':
+            try:
+                filename = sys.argv[i+1]
+                hdul = fits.open(filename)
+            except:
+                print('Error: file not found or in wrong format.')
+                filename = ''
+            if i+1>=len(sys.argv): break
+            elif sys.argv[i+1][0] == '-': i+=1
+            else: i+=2
+        elif sys.argv[i] == '-o' or sys.argv[i] == '-output':
+            try:
+                fitsdir = sys.argv[i+1]
+            except:
+                print('Error: output directory in wrong format.')
+            if i+1>=len(sys.argv): break
+            elif sys.argv[i+1][0] == '-': i+=1
+            else: i+=2
+        else: pass
+        if i>=len(sys.argv): break
         
 if filename == '':
     print('Listing available files in FITS file directory...')

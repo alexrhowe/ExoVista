@@ -2,54 +2,83 @@ import math
 import numpy as np
 from scipy.interpolate import interp1d
 import pandas as pd
+from src.constants import *
 
 def load_target_list(target_list_file):
 
     # Read in target list.
     
-    nheaderlines = 2
     fin = open(target_list_file,'r')
-    header = fin.readline().split()
+    header = fin.readline().replace(',',' ').replace('|',' ').split()
     hlen = len(header)
-    for i in range(0,nheaderlines-1): fin.readline()
+    
     lines = fin.readlines()
-    dlen = len(lines)
+    start = 0
+    for line in lines:
+        if len(line.replace('|',',').split(','))<hlen:
+            start+=1
+        else: break
+    dlen = len(lines)-start
 
     grid = []
-    
     target_list = []
-    hips = np.zeros(dlen)
-    intlist = ['ID', 'HIP']
-    strlist = ['TYC2', 'WDS', 'Type']
-
+    finalheader = []
+    headerindex = []
+    
     # Clean up header from file.
-    for i in range(0,hlen):
+    for i in range(start,hlen):
         header[i] = header[i].split('(')[0]
         header[i] = header[i].split(',')[0]
-        if header[i] == 'DEC': header[i] = 'Dec'
-        if header[i] == 'pmDEC': header[i] = 'pmDec'
-    
+        header[i] = header[i].replace('_','')
+        
+        for h in alias:
+            if header[i].lower().startswith(h.lower()):
+                if h.lower()=='ra' and header[i].lower().startswith('rad'): continue
+                if alias[h] in finalheader: continue
+                finalheader.append(alias[h])
+                headerindex.append(i)
+                break
+            else: continue
+
+    if 'Lstar' not in finalheader:
+        print('Error: \"Lstar\" missing from input file.')
+        exit()
+    if 'Dist' not in finalheader:
+        print('Error: \"Dist\" missing from input file.')
+        exit()
+    if 'Type' not in finalheader:
+        print('Error: \"Type\" missing from input file.')
+        exit()
+    if 'Vmag' not in finalheader:
+        print('Error: \"Vmag\" missing from input file.')
+        exit()
+    if 'Umag' not in finalheader and 'Bmag' not in finalheader:
+        print('Error: need a U or B magnitude in input file.')
+        exit()
+    if 'Rmag' not in finalheader and 'Rmag' not in finalheader and 'Rmag' not in finalheader and 'Rmag' not in finalheader and 'Rmag' not in finalheader:
+        print('Error: need an R, I, J, H, or K magnitude in input file.')
+        exit()        
+            
     for i in range(0,dlen):
         grid.append([])
-        line = lines[i].replace('|',',').split(',')
+        line = lines[i+start].replace('|',',').split(',')
         
-        for j in range(0,hlen):
-            if header[j] in intlist:
-                try: grid[i].append(int(line[j].strip()))
+        for j in range(0,len(headerindex)):
+            if finalheader[j] in intlist:
+                try: grid[i].append(int(line[headerindex[j]].strip()))
                 except:
-                    try: grid[i].append(int(float(line[j].strip())))
+                    try: grid[i].append(int(float(line[headerindex[j]].strip())))
                     except: grid[i].append(math.nan)
-            elif header[j] in strlist:
-                grid[i].append(line[j].strip())
+            elif finalheader[j] in strlist:
+                grid[i].append(line[headerindex[j]].strip())
             else:
-                try: grid[i].append(float(line[j].strip()))
+                try: grid[i].append(float(line[headerindex[j]].strip()))
                 except: grid[i].append(math.nan)
-        hips[i] = grid[i][1]
-
-    target_list = pd.DataFrame(grid,columns=header)
-        
+                
+    target_list = pd.DataFrame(grid,columns=finalheader)
+    
     # Finished reading target list.
-
+    
     # Compute derived quantities.
 
     Lstar = target_list['Lstar'].values
@@ -74,7 +103,7 @@ def load_stars(target_list_file):
     # Filter down target list.
     
     # Eliminate targets with non-finite values for necessary quantities.
-    target_list = target_list[np.isfinite(target_list['Lstar']) & np.isfinite(target_list['dist']) & np.isfinite(target_list['Vmag']) & np.isfinite(target_list['M_V'])]
+    target_list = target_list[np.isfinite(target_list['Lstar']) & np.isfinite(target_list['dist']) & np.isfinite(target_list['Vmag'])]
     
     # Eliminate targets that do not have appropriate comparison magnitudes.
     target_list = target_list[target_list['Umag'].notna() | target_list['Bmag'].notna()]
