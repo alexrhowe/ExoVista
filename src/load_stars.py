@@ -43,8 +43,8 @@ def load_target_list(target_list_file):
     if 'Lstar' not in finalheader:
         print('Error: \"Lstar\" missing from input file.')
         exit()
-    if 'Dist' not in finalheader:
-        print('Error: \"Dist\" missing from input file.')
+    if 'dist' not in finalheader:
+        print('Error: \"dist\" missing from input file.')
         exit()
     if 'Type' not in finalheader:
         print('Error: \"Type\" missing from input file.')

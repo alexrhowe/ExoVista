@@ -58,7 +58,7 @@ def radius_to_mass(R):
     M[i] = (R[i]/1.008)**(1./0.279)
     i = [j for j in range(0,len(R)) if R[j]>1.008 * 2.04**0.279]
     M[i] = (R[i]/(1.008 * 2.04**0.279))**(1./0.589) * 2.04
-    i = [j for j in range(0,len(R)) if R[j]>12.28] # R(M) is not monotonic in this range.
+    i = [j for j in range(0,len(R)) if R[j]>12.22] # R(M) is not monotonic in this range.
     M[i] = -1.
 
     return M
