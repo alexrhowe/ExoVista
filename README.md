@@ -1,3 +1,6 @@
+**NOTE: THIS VERSION OF EXOVISTA IS DEPRECATED AS OF JANUARY 2026
+V2.5+ IS POSTED ON THE NASA GITHUB HERE: https://github.com/nasa/ExoVista/**
+
 # ExoVista v2.4
 August 11, 2023
 Alex Howe & Chris Stark
